@@ -1,0 +1,14 @@
+name: linearvc
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+dependencies:
+  - python=3
+  - jupyter
+  - ipython
+  - numpy
+  - tqdm
+  - pytorch
+  - celer
+  - torchaudio
