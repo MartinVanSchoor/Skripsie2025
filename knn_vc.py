@@ -1,5 +1,4 @@
 import numpy as np
-import scipy
 import torch
 import torchaudio
 from tqdm import tqdm
@@ -25,7 +24,7 @@ class kNN_VC(torch.nn.Module):
         Returns features from file specified by audio_fn as a tensor with 1024 dimensions
         VAD can be applie if vad=True
         """
-        # Retrieve audio and convert to correct device
+        # Retrieve audio
         source_audio, sr = torchaudio.load(audio_fn)
         # Convert to mono if stereo
         if source_audio.shape[0] > 1:
@@ -37,6 +36,7 @@ class kNN_VC(torch.nn.Module):
                 self.resampler = torchaudio.transforms.Resample(orig_freq=sr, new_freq=self.sr_target)
             source_audio = self.resampler(source_audio)
             sr = self.sr_target
+        # Convert to appropriate device
         source_audio = source_audio.to(self.device)
         
         # Use the WavLM SSL to extract features
