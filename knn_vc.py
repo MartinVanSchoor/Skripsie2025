@@ -52,9 +52,9 @@ class kNN_VC(torch.nn.Module):
         # Use the WavLM SSL to extract features
         if mode == 0:
             # Divide the target audio into chunks and extract the features
-            chunk_length = audio.shape[1] // 36
+            chunk_length = largest_divisor_in_range(audio.shape[1])
             chunk_list = []
-            for i in range(36):
+            for i in range(audio.shape[1]//chunk_length):
                 chunk = audio[:,(i*chunk_length):((i+1)*chunk_length)]
                 chunk_features, _ = self.wavlm.extract_features(chunk, output_layer=6)
                 chunk_features = chunk_features.squeeze()
@@ -115,11 +115,11 @@ def main():
     
     # Extract the source features
     source_features = vc_model.get_features(source_wav_filename, mode=1)
-    print(source_features)
+    print(source_features.shape)
     
     # Perform kNN matching to get output features
     output_features = vc_model.knn_matching(source_features, target_features)
-    print(output_features)
+    print(output_features.shape)
     
     # Vocode and save the output
     output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
