@@ -8,6 +8,11 @@ import torchaudio.functional as F
 n_frames = None
 k_top = 4
 
+def largest_divisor_in_range(n, low=5000, high=800_000):
+    for d in range(high, low - 1, -1):
+        if n % d == 0:
+            return d
+
 class kNN_VC(torch.nn.Module):
     def __init__(self, wavlm, hifigan, k, device="cpu"):
         super().__init__()
