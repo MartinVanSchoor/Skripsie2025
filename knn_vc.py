@@ -14,64 +14,111 @@ class kNN_VC(torch.nn.Module):
         self.wavlm = wavlm.eval()
         self.hifigan = hifigan.eval()
         self.k = k
-        self.device = device
-        self.resampler = None  
+        self.device = device 
         self.sr_target = 16000
         
     @torch.inference_mode()
-    def get_features(self, audio_fn):
+    def get_features(self, audio_fn, mode):
         """
-        Returns features from file specified by audio_fn as a tensor with 1024 dimensions
-        VAD can be applie if vad=True
+        Returns  SSL features from file specified by audio_fn using WavLM-large
+        
+        mode = 0: Extract and return target features, using chunking
+        mode = 1: Extract and return source features
         """
+        ## Asserts start
+        assert mode in (0, 1), f'"mode" must be 0 or 1, but got {mode}'
+        ## Asserts end
+        
         # Retrieve audio
-        source_audio, sr = torchaudio.load(audio_fn)
+        audio, sr = torchaudio.load(audio_fn)
         # Convert to mono if stereo
-        if source_audio.shape[0] > 1:
-            source_audio = source_audio.mean(dim=0, keepdim=True)
+        if audio.shape[0] > 1:
+            audio = audio.mean(dim=0, keepdim=True)
         # Resample to 16kHz if needed
-        if sr != self.sr_target:
-            # Create resampler only once
-            if self.resampler is None or self.resampler.orig_freq != sr:
-                self.resampler = torchaudio.transforms.Resample(orig_freq=sr, new_freq=self.sr_target)
-            source_audio = self.resampler(source_audio)
-            sr = self.sr_target
+        if not sr == self.sr_target:
+            audio = F.resample(
+                audio,
+                orig_freq=sr,
+                new_freq=self.sr_target,
+            )
         # Convert to appropriate device
-        source_audio = source_audio.to(self.device)
+        audio = audio.to(self.device)
         
         # Use the WavLM SSL to extract features
-        features, _ = self.wavlm.extract_features(source_audio, output_layer=6)
-        features = features.squeeze(0)
-        
-        return features
+        if mode == 0:
+            # Divide the target audio into chunks and extract the features
+            chunk_length = audio.shape[1] // 36
+            chunk_list = []
+            for i in range(36):
+                chunk = audio[:,(i*chunk_length):((i+1)*chunk_length)]
+                chunk_features, _ = self.wavlm.extract_features(chunk, output_layer=6)
+                chunk_features = chunk_features.squeeze()
+                chunk_list.append(chunk_features)
+            target_features = torch.cat(chunk_list, dim=0)
+            return target_features
+        elif mode == 1:
+            # Extract the features from the source audio
+            source_features, _ = self.wavlm.extract_features(audio, output_layer=6)
+            source_features = source_features.squeeze()
+            return source_features
     
     @torch.inference_mode()
-    def vocode(self, input_features):
+    def vocode(self, output_features):
         """ 
-        Returns the waveform samples
+        Returns the waveform samples using hifigan vocoder
         """
-        wav_hat = self.hifigan(input_features).squeeze(0)
-        return wav_hat.cpu().squeeze().cpu()
+        wav_hat = self.hifigan(output_features)
+        wav_hat = wav_hat.squeeze(1)
+        return wav_hat
     
     @torch.inference_mode()
     def knn_matching(self, source_feats, target_feats):
         """ 
         Performs kNN matching and returns the output features
         """
-        nn = NearestNeighbors(n_neighbors=self.k, metric='cosine')
-        nn.fit(target_feats)
-        
-        
+        # Convert to numpy for sklearn
+        source_np = source_feats.cpu().numpy()
+        target_np = target_feats.cpu().numpy()
+        # Fit NearestNeighbors using cosine distance
+        nn = NearestNeighbors(n_neighbors=self.k, metric="cosine")
+        nn.fit(target_np)
+        # Find 4 nearest neighbors for each source row
+        distances, indices = nn.kneighbors(source_np)  # indices: (N_source, 4)
+        # Average the 4 neighbors for each source entry
+        averaged = np.array([
+            target_np[neighbor_indices].mean(axis=0)
+            for neighbor_indices in indices
+        ])  
+        # Convert back to torch
+        output_features = torch.from_numpy(averaged).to(self.device)   
+        return output_features  
         
 def main():
     # Specify filenames and other variables
     device = "cpu"
     source_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source1_martin.wav"
     target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target1_trump.wav"
-    output_path = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output1.wav"
+    output_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output1.wav"
     # Load in the neccessary models (SSL feature extractor and Vocoder)
-    #wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
-    #hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
-
+    wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
+    hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
+    
+    # Extract the target features 
+    vc_model = kNN_VC(wavlm, hifigan, k_top, device)
+    target_features = vc_model.get_features(target_wav_filename, mode=0)
+    print(target_features.shape)
+    
+    # Extract the source features
+    source_features = vc_model.get_features(source_wav_filename, mode=1)
+    print(source_features)
+    
+    # Perform kNN matching to get output features
+    output_features = vc_model.knn_matching(source_features, target_features)
+    print(output_features)
+    
+    # Vocode and save the output
+    output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
+    torchaudio.save(output_filename, output_wav[None], vc_model.sr_target)
+    
 if __name__ == "__main__":
     main()
