@@ -101,9 +101,9 @@ class kNN_VC(torch.nn.Module):
 def main():
     # Specify filenames and other variables
     device = "cpu"
-    source_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source1_martin.wav"
+    source_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source3_werner.wav"
     target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target1_trump.wav"
-    output_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output1.wav"
+    output_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output2.wav"
     # Load in the neccessary models (SSL feature extractor and Vocoder)
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
     hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
