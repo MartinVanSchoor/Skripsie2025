@@ -1,9 +1,9 @@
 import numpy as np
 import torch
 import torchaudio
-from tqdm import tqdm
 from sklearn.neighbors import NearestNeighbors
 import torchaudio.functional as F
+import time
 
 n_frames = None
 k_top = 4
@@ -101,12 +101,15 @@ class kNN_VC(torch.nn.Module):
 def main():
     # Specify filenames and other variables
     device = "cpu"
-    source_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source3_werner.wav"
+    source_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source5_zaid.wav"
     target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target1_trump.wav"
-    output_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output2.wav"
+    output_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output5.wav"
     # Load in the neccessary models (SSL feature extractor and Vocoder)
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
     hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
+    
+    # Timing
+    start = time.time()
     
     # Extract the target features 
     vc_model = kNN_VC(wavlm, hifigan, k_top, device)
@@ -124,6 +127,10 @@ def main():
     # Vocode and save the output
     output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
     torchaudio.save(output_filename, output_wav[None], vc_model.sr_target)
+    
+    # Timing
+    end = time.time()
+    print(f"Time: {(end - start)/60:.2f} minutes")
     
 if __name__ == "__main__":
     main()
