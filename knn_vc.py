@@ -4,7 +4,9 @@ import torchaudio
 from sklearn.neighbors import NearestNeighbors
 import torchaudio.functional as F
 import time
-import linearvc_Kamper.intelligibility as intelligibility
+import intelligibility_adapted as intelligibility
+from types import SimpleNamespace
+from pathlib import Path
 
 n_frames = None
 k_top = 4
@@ -15,12 +17,13 @@ def largest_divisor_in_range(n, low=5000, high=800_000):
             return d
         
 def evaluate_performance(groundtruth, converted):
-    class Arguments: pass
-    args = Arguments()
-    args.format = "librispeech"
-    args.converted_dir = converted
-    args.groundtruth_dir = groundtruth  
-    intelligibility.check_argv()
+    args = SimpleNamespace(
+        format="librispeech",
+        converted_dir=converted,
+        groundtruth_dir=groundtruth,
+        whisper="small"
+    )
+    intelligibility.main(args)
     print("success")
 
 class kNN_VC(torch.nn.Module):
@@ -80,7 +83,7 @@ class kNN_VC(torch.nn.Module):
     @torch.inference_mode()
     def vocode(self, output_features):
         """ 
-        Returns the waveform samples using hifigan vocoder
+        Returns the waveform samples using a pretrained HiFi-GAN vocoder
         """
         wav_hat = self.hifigan(output_features)
         wav_hat = wav_hat.squeeze(1)
@@ -114,8 +117,8 @@ def main():
     source_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source/source1_martin.wav"
     target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data//target/target2_rfk.wav"
     output_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output/output1_MartinToRFK.wav"
-    groundtruth_dir = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/Librispeech/test-clean"
-    output_dir = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output"
+    librispeech_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/Librispeech/test-clean")
+    output_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output")
     # Load in the neccessary models (SSL feature extractor and Vocoder)
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
     hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
@@ -131,9 +134,11 @@ def main():
     # Extract the source features
     source_features = vc_model.get_features(source_wav_filename, mode=1)
     print(f"Extracted {source_features.shape[0]} features from source speaker")
+    print("Features extracted, performing kNN matching...")
     
     # Perform kNN matching to get output features
     output_features = vc_model.knn_matching(source_features, target_features)
+    print("Matching complete, vocoding output...")
     
     # Vocode and save the output
     output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
@@ -141,10 +146,11 @@ def main():
     
     # Timing
     end = time.time()
-    print(f"Time: {(end - start)/60:.2f} minutes")
+    print(f"Finished in time: {(end - start)/60:.2f} minutes")
+    print("Evaluating performance...")
     
     # Performance evaluation 
-    #evaluate_performance(groundtruth_dir, output_dir)
+    evaluate_performance(librispeech_dir, output_dir)
     
     
 if __name__ == "__main__":

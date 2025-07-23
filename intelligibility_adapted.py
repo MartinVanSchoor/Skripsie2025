@@ -5,6 +5,8 @@ Perform ASR and evaluate WER in order to measure intelligibility.
 
 Author: Herman Kamper
 Date: 2024
+
+Modified by: Marthinus Enslin Van Schoor
 """
 
 from pathlib import Path
@@ -62,7 +64,7 @@ def main(args):
                 transcript[transcript_fn.stem] = line
 
     # ASR
-    model = whisper.load_model(args.whisper, device="cuda")
+    model = whisper.load_model(args.whisper, device="cpu")
     print("Whisper loaded successfully")
 
     print("Reading:", args.converted_dir)
@@ -71,11 +73,7 @@ def main(args):
     for wav_fn in tqdm(sorted(args.converted_dir.rglob("*.wav"))):
         transcript_hat = model.transcribe(str(wav_fn), language="english")
         predictions.append(transcript_hat["text"])
-
-        if args.format == "librispeech":
-            transcript_key = wav_fn.parent.stem
-        elif args.format == "vctk":
-            transcript_key = wav_fn.stem
+        transcript_key = wav_fn.stem
         labels.append(transcript[transcript_key])
 
     # eval_transform = jiwer.Compose(
