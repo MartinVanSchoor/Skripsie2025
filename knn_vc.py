@@ -4,6 +4,7 @@ import torchaudio
 from sklearn.neighbors import NearestNeighbors
 import torchaudio.functional as F
 import time
+import linearvc_Kamper.intelligibility as intelligibility
 
 n_frames = None
 k_top = 4
@@ -13,11 +14,13 @@ def largest_divisor_in_range(n, low=5000, high=800_000):
         if n % d == 0:
             return d
         
-def evaluate_performance():
+def evaluate_performance(groundtruth, converted):
     class Arguments: pass
     args = Arguments()
     args.format = "librispeech"
-    
+    args.converted_dir = converted
+    args.groundtruth_dir = groundtruth  
+    intelligibility.check_argv()
     print("success")
 
 class kNN_VC(torch.nn.Module):
@@ -108,40 +111,40 @@ class kNN_VC(torch.nn.Module):
 def main():
     # Specify filenames and other variables
     device = "cpu"
-    source_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source5_zaid.wav"
-    target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target1_trump.wav"
-    output_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output5.wav"
-    groundtruth_dir = "mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/Librispeech/test-clean"
+    source_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source/source1_martin.wav"
+    target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data//target/target2_rfk.wav"
+    output_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output/output1_MartinToRFK.wav"
+    groundtruth_dir = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/Librispeech/test-clean"
+    output_dir = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output"
     # Load in the neccessary models (SSL feature extractor and Vocoder)
-    # wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
-    # hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
+    wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
+    hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
     
-    # # Timing
-    # start = time.time()
+    # Timing
+    start = time.time()
     
-    # # Extract the target features 
-    # vc_model = kNN_VC(wavlm, hifigan, k_top, device)
-    # target_features = vc_model.get_features(target_wav_filename, mode=0)
-    # print(target_features.shape)
+    # Extract the target features 
+    vc_model = kNN_VC(wavlm, hifigan, k_top, device)
+    target_features = vc_model.get_features(target_wav_filename, mode=0)
+    print(f"Extracted {target_features.shape[0]} features from target speaker")
     
-    # # Extract the source features
-    # source_features = vc_model.get_features(source_wav_filename, mode=1)
-    # print(source_features.shape)
+    # Extract the source features
+    source_features = vc_model.get_features(source_wav_filename, mode=1)
+    print(f"Extracted {source_features.shape[0]} features from source speaker")
     
-    # # Perform kNN matching to get output features
-    # output_features = vc_model.knn_matching(source_features, target_features)
-    # print(output_features.shape)
+    # Perform kNN matching to get output features
+    output_features = vc_model.knn_matching(source_features, target_features)
     
-    # # Vocode and save the output
-    # output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
-    # torchaudio.save(output_filename, output_wav[None], vc_model.sr_target)
+    # Vocode and save the output
+    output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
+    torchaudio.save(output_filename, output_wav[None], vc_model.sr_target)
     
-    # # Timing
-    # end = time.time()
-    # print(f"Time: {(end - start)/60:.2f} minutes")
+    # Timing
+    end = time.time()
+    print(f"Time: {(end - start)/60:.2f} minutes")
     
-    # Testing (remove later)
-    evaluate_performance
+    # Performance evaluation 
+    #evaluate_performance(groundtruth_dir, output_dir)
     
     
 if __name__ == "__main__":
