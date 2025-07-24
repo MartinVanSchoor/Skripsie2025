@@ -7,6 +7,7 @@ import time
 import intelligibility_adapted as intelligibility
 from types import SimpleNamespace
 from pathlib import Path
+import tqdm
 
 n_frames = None
 k_top = 4
@@ -150,7 +151,7 @@ def main():
     print("Evaluating performance...")
     
     # Performance evaluation 
-    evaluate_performance(librispeech_dir, output_dir)
+    # evaluate_performance(librispeech_dir, output_dir)
     
     
 if __name__ == "__main__":

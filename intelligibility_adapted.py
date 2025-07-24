@@ -74,6 +74,8 @@ def main(args):
         transcript_hat = model.transcribe(str(wav_fn), language="english")
         predictions.append(transcript_hat["text"])
         transcript_key = wav_fn.stem
+        print("Looking for key:", transcript_key)
+        print("Available keys (sample):", list(transcript.keys())[:10])
         labels.append(transcript[transcript_key])
 
     # eval_transform = jiwer.Compose(
