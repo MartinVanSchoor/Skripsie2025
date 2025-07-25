@@ -67,8 +67,6 @@ def main(args):
         transcript_hat = model.transcribe(str(wav_fn), language="english")
         predictions.append(transcript_hat["text"])
         transcript_key = wav_fn.stem
-        print("Looking for key:", transcript_key)
-        print("Available keys (sample):", list(transcript.keys())[:10])
         labels.append(transcript[transcript_key])
 
     # WER: Bootstrap confidence interval
@@ -93,8 +91,8 @@ def main(args):
         sample_wer = jiwer.wer(
             sample_labels,
             sample_predictions,
+            reference_transform=eval_transform_wer,
             hypothesis_transform=eval_transform_wer,
-            truth_transform=eval_transform_wer,
         )
         wers.append(sample_wer)
     wer_mean = np.mean(wers) * 100
@@ -123,8 +121,8 @@ def main(args):
         sample_cer = jiwer.cer(
             sample_labels,
             sample_predictions,
+            reference_transform=eval_transform_cer,
             hypothesis_transform=eval_transform_cer,
-            truth_transform=eval_transform_cer,
         )
         cers.append(sample_cer)
     cer_mean = np.mean(cers) * 100

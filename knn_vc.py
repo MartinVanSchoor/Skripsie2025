@@ -131,12 +131,12 @@ def main():
     
 
 ### Load in the neccessary models {SSL feature extractor (WavLM) and Vocoder (HiFi-GAN)}
-    # wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
-    # hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
+    wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
+    hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
     
 ### Timing start and model initialization
-    # start = time.time()
-    # vc_model = kNN_VC(wavlm, hifigan, k_top, device)
+    start = time.time()
+    vc_model = kNN_VC(wavlm, hifigan, k_top, device)
     
 ### Target feature extraction/loading
     # Extract the target features from an audio file
@@ -179,8 +179,8 @@ def main():
 ### Conversion of librispeech data according to eval.csv for Similarity
     
 ### Timing end
-    # end = time.time()
-    # print(f"Finished in time: {(end - start)/60:.2f} minutes")
+    end = time.time()
+    print(f"Finished in time: {(end - start)/60:.2f} minutes")
     
 ### Performance evaluation 
     print("Evaluating performance")
