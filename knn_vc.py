@@ -113,50 +113,71 @@ class kNN_VC(torch.nn.Module):
         return output_features  
         
 def main():
-    # Specify filenames and other variables
+    
+### Specify filenames and other variables
     device = "cpu"
-    source_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source/source3_theo.wav"
     target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target3_obama.wav"
     target_feat_filename = "data/target/obama180.pt"
+    source_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source/source3_theo.wav"
     output_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output/output_TheoToObama.wav"
     librispeech_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/Librispeech/test-clean/1089/134686")
-    output_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output")
-    # Load in the neccessary models (SSL feature extractor and Vocoder)
+    output_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/intelligibility_180")
+
+### Load in the neccessary models {SSL feature extractor (WavLM) and Vocoder (HiFi-GAN)}
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
     hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
     
-    # Timing
+### Timing start and model initialization
     start = time.time()
     vc_model = kNN_VC(wavlm, hifigan, k_top, device)
     
-    # # Extract the target features 
+### Target feature extraction/loading
+    # Extract the target features from an audio file
     # target_features = vc_model.get_features(target_wav_filename, mode=0)
     # print(f"Extracted {target_features.shape[0]} features from target speaker")
-    # Load the target features
+    
+    # Load the target featuresfrom .pt file
     target_features = torch.load(target_feat_filename)
     print(f"Loaded {target_features.shape[0]} features from target speaker")
     
+### Normal, real-world conversion
     # Extract the source features
-    source_features = vc_model.get_features(source_wav_filename, mode=1)
-    print(f"Extracted {source_features.shape[0]} features from source speaker")
-    print("Features extracted, performing kNN matching...")
+    # source_features = vc_model.get_features(source_wav_filename, mode=1)
+    # print(f"Extracted {source_features.shape[0]} features from source speaker")
+    # print("Features extracted, performing kNN matching...")
     
-    # Perform kNN matching to get output features
-    output_features = vc_model.knn_matching(source_features, target_features)
-    print("Matching complete, vocoding output...")
+    # # Perform kNN matching to get output features
+    # output_features = vc_model.knn_matching(source_features, target_features)
+    # print("Matching complete, vocoding output...")
     
-    # Vocode and save the output
-    output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
-    torchaudio.save(output_filename, output_wav[None], vc_model.sr_target)
+    # # Vocode and save the output
+    # output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
+    # torchaudio.save(output_filename, output_wav[None], vc_model.sr_target)
     
-    # Timing
+### Conversion of librispeech data for Intelligibilty
+    # for flac_name in sorted(f.name for f in librispeech_dir.glob("*.flac")):
+    #     # Get source file path
+    #     source_path = librispeech_dir / flac_name
+    #     wav_name = Path(flac_name).with_suffix(".wav")
+    #     output_path = output_dir / wav_name
+    #     # Extract features
+    #     source_features = vc_model.get_features(source_path, mode=1)
+    #     print(f"Extracted {source_features.shape[0]} features from {flac_name}")
+    #     # Perform matching, vocode output and save
+    #     output_features = vc_model.knn_matching(source_features, target_features)
+    #     output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
+    #     torchaudio.save(output_path, output_wav[None], vc_model.sr_target)
+    #     print (f"Voice converted {flac_name} successfully")
+
+### Conversion of librispeech data according to eval.csv for Similarity
+    
+### Timing end
     end = time.time()
     print(f"Finished in time: {(end - start)/60:.2f} minutes")
-    print("Evaluating performance...")
     
-    # Performance evaluation 
-    evaluate_performance(librispeech_dir, output_dir)
-    
+### Performance evaluation 
+    # print("Evaluating performance")
+    # evaluate_performance(librispeech_dir, output_dir)
     
 if __name__ == "__main__":
     main()
