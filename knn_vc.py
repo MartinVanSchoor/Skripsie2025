@@ -4,7 +4,7 @@ import torchaudio
 from sklearn.neighbors import NearestNeighbors
 import torchaudio.functional as F
 import time
-import intelligibility_adapted as intelligibility
+import intelligibility
 from types import SimpleNamespace
 from pathlib import Path
 import tqdm
@@ -115,10 +115,11 @@ class kNN_VC(torch.nn.Module):
 def main():
     # Specify filenames and other variables
     device = "cpu"
-    source_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source/source1_martin.wav"
-    target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data//target/target2_rfk.wav"
-    output_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output/output1_MartinToRFK.wav"
-    librispeech_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/Librispeech/test-clean")
+    source_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source/source3_theo.wav"
+    target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target3_obama.wav"
+    target_feat_filename = "data/target/obama180.pt"
+    output_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output/output_TheoToObama.wav"
+    librispeech_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/Librispeech/test-clean/1089/134686")
     output_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output")
     # Load in the neccessary models (SSL feature extractor and Vocoder)
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
@@ -126,11 +127,14 @@ def main():
     
     # Timing
     start = time.time()
-    
-    # Extract the target features 
     vc_model = kNN_VC(wavlm, hifigan, k_top, device)
-    target_features = vc_model.get_features(target_wav_filename, mode=0)
-    print(f"Extracted {target_features.shape[0]} features from target speaker")
+    
+    # # Extract the target features 
+    # target_features = vc_model.get_features(target_wav_filename, mode=0)
+    # print(f"Extracted {target_features.shape[0]} features from target speaker")
+    # Load the target features
+    target_features = torch.load(target_feat_filename)
+    print(f"Loaded {target_features.shape[0]} features from target speaker")
     
     # Extract the source features
     source_features = vc_model.get_features(source_wav_filename, mode=1)
@@ -151,7 +155,7 @@ def main():
     print("Evaluating performance...")
     
     # Performance evaluation 
-    # evaluate_performance(librispeech_dir, output_dir)
+    evaluate_performance(librispeech_dir, output_dir)
     
     
 if __name__ == "__main__":
