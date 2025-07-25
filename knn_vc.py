@@ -17,10 +17,10 @@ def largest_divisor_in_range(n, low=5000, high=800_000):
         if n % d == 0:
             return d
         
-def evaluate_performance(groundtruth, converted):
+def evaluate_performance(groundtruth, converted_I):
     args = SimpleNamespace(
         format="librispeech",
-        converted_dir=converted,
+        converted_dir=converted_I,
         groundtruth_dir=groundtruth,
         whisper="small"
     )
@@ -116,20 +116,27 @@ def main():
     
 ### Specify filenames and other variables
     device = "cpu"
+    # Target 
     target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target3_obama.wav"
     target_feat_filename = "data/target/obama180.pt"
+    # Source and output, real world
     source_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source/source3_theo.wav"
     output_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output/output_TheoToObama.wav"
+    # Source and output, intelligibility
     librispeech_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/Librispeech/test-clean/1089/134686")
-    output_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/intelligibility_180")
+    output_dir_I = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/intelligibility_180")
+    # Source and output, similarity
+    eval_csv = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/eval.csv")
+    output_dir_S = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/similarity_180")
+    
 
 ### Load in the neccessary models {SSL feature extractor (WavLM) and Vocoder (HiFi-GAN)}
-    wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
-    hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
+    # wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
+    # hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
     
 ### Timing start and model initialization
-    start = time.time()
-    vc_model = kNN_VC(wavlm, hifigan, k_top, device)
+    # start = time.time()
+    # vc_model = kNN_VC(wavlm, hifigan, k_top, device)
     
 ### Target feature extraction/loading
     # Extract the target features from an audio file
@@ -137,8 +144,8 @@ def main():
     # print(f"Extracted {target_features.shape[0]} features from target speaker")
     
     # Load the target featuresfrom .pt file
-    target_features = torch.load(target_feat_filename)
-    print(f"Loaded {target_features.shape[0]} features from target speaker")
+    # target_features = torch.load(target_feat_filename)
+    # print(f"Loaded {target_features.shape[0]} features from target speaker")
     
 ### Normal, real-world conversion
     # Extract the source features
@@ -159,7 +166,7 @@ def main():
     #     # Get source file path
     #     source_path = librispeech_dir / flac_name
     #     wav_name = Path(flac_name).with_suffix(".wav")
-    #     output_path = output_dir / wav_name
+    #     output_path = output_dir_I / wav_name
     #     # Extract features
     #     source_features = vc_model.get_features(source_path, mode=1)
     #     print(f"Extracted {source_features.shape[0]} features from {flac_name}")
@@ -172,12 +179,12 @@ def main():
 ### Conversion of librispeech data according to eval.csv for Similarity
     
 ### Timing end
-    end = time.time()
-    print(f"Finished in time: {(end - start)/60:.2f} minutes")
+    # end = time.time()
+    # print(f"Finished in time: {(end - start)/60:.2f} minutes")
     
 ### Performance evaluation 
-    # print("Evaluating performance")
-    # evaluate_performance(librispeech_dir, output_dir)
+    print("Evaluating performance")
+    evaluate_performance(librispeech_dir, output_dir_I)
     
 if __name__ == "__main__":
     main()
