@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.so
+*.ipynb_checkpoints
+
+# Virtual environments
+.env/
+.venv/
+env/
+venv/
+ENV/
+*.env
+
+# PyTorch / TensorFlow checkpoints
+*.ckpt
+*.pth
+*.pt
+*.h5
+*.tflite
+checkpoints/
+models/
+
+# Logs and outputs
+*.log
+logs/
+output/
+outputs/
+
+# Audio files
+*.wav
+*.flac
+*.mp3
+audio/
+samples/
+converted_audio/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# VSCode
+.vscode/
+
+# Data
+data/
+dataset/
+*.tar
+*.zip
+*.gz
