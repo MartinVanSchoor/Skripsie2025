@@ -115,7 +115,7 @@ class kNN_VC(torch.nn.Module):
 def main():
     
 ### Specify filenames and other variables
-    device = "cpu"
+    device = "cuda"
     # Target 
     target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target3_obama.wav"
     target_feat_filename = "data/target/rfk2_5.pt"
@@ -190,22 +190,22 @@ def main():
     # print(f"Finished in time: {(end - start)/60:.2f} minutes")
     
 ### Performance evaluation 
-    print("Evaluating performance for target = Obama")
-    out = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/intelligibility/180_obama")
-    wer_mean1, wer_std1, cer_mean1, cer_std1 = evaluate_intelligibility(librispeech_dir, out)
-    print("Evaluating performance for target = Trump")
-    out = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/intelligibility/180_trump")
-    wer_mean2, wer_std2, cer_mean2, cer_std2 = evaluate_intelligibility(librispeech_dir, out)
-    print("Evaluating performance for target = RFK")
-    out = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/intelligibility/180_rfk")
-    wer_mean3, wer_std3, cer_mean3, cer_std3 = evaluate_intelligibility(librispeech_dir, out)
-    wer_mean = (wer_mean1 + wer_mean2 + wer_mean3) / 3
-    wer_std = (wer_std1 + wer_std2 + wer_std3) / 3
-    cer_mean = (cer_mean1 + cer_mean2 + cer_mean3) / 3
-    cer_std = (cer_std1 + cer_std2 + cer_std3) / 3
-    print("Overall results:")
-    print(f"WER: {wer_mean:.2f}% +- {wer_std:.2f}%")
-    print(f"CER: {cer_mean:.2f}% +- {cer_std:.2f}%")
+    # print("Evaluating performance for target = Obama")
+    # out = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/intelligibility/180_obama")
+    # wer_mean1, wer_std1, cer_mean1, cer_std1 = evaluate_intelligibility(librispeech_dir, out)
+    # print("Evaluating performance for target = Trump")
+    # out = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/intelligibility/180_trump")
+    # wer_mean2, wer_std2, cer_mean2, cer_std2 = evaluate_intelligibility(librispeech_dir, out)
+    # print("Evaluating performance for target = RFK")
+    # out = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/intelligibility/180_rfk")
+    # wer_mean3, wer_std3, cer_mean3, cer_std3 = evaluate_intelligibility(librispeech_dir, out)
+    # wer_mean = (wer_mean1 + wer_mean2 + wer_mean3) / 3
+    # wer_std = (wer_std1 + wer_std2 + wer_std3) / 3
+    # cer_mean = (cer_mean1 + cer_mean2 + cer_mean3) / 3
+    # cer_std = (cer_std1 + cer_std2 + cer_std3) / 3
+    # print("Overall results:")
+    # print(f"WER: {wer_mean:.2f}% +- {wer_std:.2f}%")
+    # print(f"CER: {cer_mean:.2f}% +- {cer_std:.2f}%")
 
     
     
