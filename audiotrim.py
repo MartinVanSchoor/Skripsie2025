@@ -1,7 +1,13 @@
 from pydub import AudioSegment
 
-audio = AudioSegment.from_mp3("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source/AUD-20250724-WA0026.mp3")
+audio1 = AudioSegment.from_wav("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target1_trump180.wav")
+audio2 = AudioSegment.from_wav("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target2_rfk180.wav")
+audio3 = AudioSegment.from_wav("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target3_obama180.wav")
 
-#trimmed1 = audio[0:180_000]
+trimmed1 = audio1[0:2_500]
+trimmed2 = audio2[0:2_500]
+trimmed3 = audio3[0:2_500]
 
-audio.export("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source/source3_theo.wav", format="wav")
+trimmed1.export("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target1_trump2_5.wav", format="wav")
+trimmed2.export("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target2_rfk2_5.wav", format="wav")
+trimmed3.export("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target3_obama2_5.wav", format="wav")

@@ -128,6 +128,9 @@ def main(args):
     cer_mean = np.mean(cers) * 100
     cer_std = np.std(cers) * 100
     print(f"CER: {cer_mean:.2f}% +- {cer_std:.2f}%")
+    
+    # Return results
+    return wer_mean, wer_std, cer_mean, cer_std
 
 
 if __name__ == "__main__":

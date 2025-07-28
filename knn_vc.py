@@ -12,20 +12,20 @@ import tqdm
 n_frames = None
 k_top = 4
 
-def largest_divisor_in_range(n, low=5000, high=800_000):
+def largest_divisor_in_range(n, low=1, high=800_000):
     for d in range(high, low - 1, -1):
         if n % d == 0:
             return d
         
-def evaluate_performance(groundtruth, converted_I):
+def evaluate_intelligibility(groundtruth, converted_I):
     args = SimpleNamespace(
         format="librispeech",
         converted_dir=converted_I,
         groundtruth_dir=groundtruth,
         whisper="small"
     )
-    intelligibility.main(args)
-    print("success")
+    wer_mean, wer_std, cer_mean, cer_std = intelligibility.main(args)
+    return wer_mean, wer_std, cer_mean, cer_std
 
 class kNN_VC(torch.nn.Module):
     def __init__(self, wavlm, hifigan, k, device="cpu"):
@@ -118,32 +118,39 @@ def main():
     device = "cpu"
     # Target 
     target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target3_obama.wav"
-    target_feat_filename = "data/target/obama180.pt"
+    target_feat_filename = "data/target/rfk2_5.pt"
     # Source and output, real world
     source_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/source/source3_theo.wav"
     output_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/output/output_TheoToObama.wav"
     # Source and output, intelligibility
     librispeech_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/Librispeech/test-clean/1089/134686")
-    output_dir_I = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/intelligibility_180")
+    output_dir_I = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/intelligibility/2_5_rfk")
     # Source and output, similarity
     eval_csv = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/eval.csv")
-    output_dir_S = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/similarity_180")
+    output_dir_S = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/similarity")
     
 
 ### Load in the neccessary models {SSL feature extractor (WavLM) and Vocoder (HiFi-GAN)}
-    wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
-    hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
+    # wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
+    # hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
     
 ### Timing start and model initialization
-    start = time.time()
-    vc_model = kNN_VC(wavlm, hifigan, k_top, device)
+    # start = time.time()
+    # vc_model = kNN_VC(wavlm, hifigan, k_top, device)
     
 ### Target feature extraction/loading
     # Extract the target features from an audio file
-    # target_features = vc_model.get_features(target_wav_filename, mode=0)
-    # print(f"Extracted {target_features.shape[0]} features from target speaker")
+    # target_features = vc_model.get_features("data/target/target1_trump2_5.wav", mode=0)
+    # torch.save(target_features, "data/target/trump2_5.pt")
+    # print(f"Extracted {target_features.shape[0]} features from trump")
+    # target_features = vc_model.get_features("data/target/target2_rfk2_5.wav", mode=0)
+    # torch.save(target_features, "data/target/rfk2_5.pt")
+    # print(f"Extracted {target_features.shape[0]} features from rfk")
+    # target_features = vc_model.get_features("data/target/target3_obama2_5.wav", mode=0)
+    # torch.save(target_features, "data/target/obama2_5.pt")
+    # print(f"Extracted {target_features.shape[0]} features from obama")
     
-    # Load the target featuresfrom .pt file
+    # Load the target features from .pt file
     # target_features = torch.load(target_feat_filename)
     # print(f"Loaded {target_features.shape[0]} features from target speaker")
     
@@ -179,12 +186,28 @@ def main():
 ### Conversion of librispeech data according to eval.csv for Similarity
     
 ### Timing end
-    end = time.time()
-    print(f"Finished in time: {(end - start)/60:.2f} minutes")
+    # end = time.time()
+    # print(f"Finished in time: {(end - start)/60:.2f} minutes")
     
 ### Performance evaluation 
-    print("Evaluating performance")
-    evaluate_performance(librispeech_dir, output_dir_I)
+    print("Evaluating performance for target = Obama")
+    out = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/intelligibility/180_obama")
+    wer_mean1, wer_std1, cer_mean1, cer_std1 = evaluate_intelligibility(librispeech_dir, out)
+    print("Evaluating performance for target = Trump")
+    out = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/intelligibility/180_trump")
+    wer_mean2, wer_std2, cer_mean2, cer_std2 = evaluate_intelligibility(librispeech_dir, out)
+    print("Evaluating performance for target = RFK")
+    out = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/intelligibility/180_rfk")
+    wer_mean3, wer_std3, cer_mean3, cer_std3 = evaluate_intelligibility(librispeech_dir, out)
+    wer_mean = (wer_mean1 + wer_mean2 + wer_mean3) / 3
+    wer_std = (wer_std1 + wer_std2 + wer_std3) / 3
+    cer_mean = (cer_mean1 + cer_mean2 + cer_mean3) / 3
+    cer_std = (cer_std1 + cer_std2 + cer_std3) / 3
+    print("Overall results:")
+    print(f"WER: {wer_mean:.2f}% +- {wer_std:.2f}%")
+    print(f"CER: {cer_mean:.2f}% +- {cer_std:.2f}%")
+
+    
     
 if __name__ == "__main__":
     main()
