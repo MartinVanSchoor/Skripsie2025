@@ -7,7 +7,7 @@ import time
 import intelligibility
 from types import SimpleNamespace
 from pathlib import Path
-import tqdm
+from tqdm import tqdm
 
 n_frames = None
 k_top = 4
@@ -115,7 +115,8 @@ class kNN_VC(torch.nn.Module):
 def main():
     
 ### Specify filenames and other variables
-    device = "cuda"
+### For Laptop
+    device = "cpu"
     # Target 
     target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target3_obama.wav"
     target_feat_filename = "data/target/rfk2_5.pt"
@@ -128,6 +129,8 @@ def main():
     # Source and output, similarity
     eval_csv = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/eval.csv")
     output_dir_S = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/similarity")
+### For Desktop
+    # device = "cuda"
     
 ### Load in the neccessary models {SSL feature extractor (WavLM) and Vocoder (HiFi-GAN)}
     # wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
