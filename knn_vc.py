@@ -115,7 +115,7 @@ class kNN_VC(torch.nn.Module):
 def main():
     
 ### Specify filenames and other variables
-    device = "cpu"
+    device = "cuda"
     # Target 
     target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target3_obama.wav"
     target_feat_filename = "data/target/rfk2_5.pt"
