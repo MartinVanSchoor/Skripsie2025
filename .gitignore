@@ -4,7 +4,6 @@ __pycache__/
 *.pyo
 *.so
 *.ipynb_checkpoints
-
 # Virtual environments
 .env/
 .venv/
@@ -12,7 +11,6 @@ env/
 venv/
 ENV/
 *.env
-
 # PyTorch / TensorFlow checkpoints
 *.ckpt
 *.pth
@@ -20,33 +18,27 @@ ENV/
 *.tflite
 checkpoints/
 models/
-
 # Logs and outputs
 *.log
 logs/
 output/
 outputs/
-
 # Audio files
 *.flac
 *.mp3
 audio/
 samples/
 converted_audio/
-
 # Temporary files
 *.tmp
 *.bak
 *.swp
 .DS_Store
 Thumbs.db
-
 # Jupyter
 .ipynb_checkpoints/
-
 # VSCode
 .vscode/
-
 # Data
 data/
 dataset/
