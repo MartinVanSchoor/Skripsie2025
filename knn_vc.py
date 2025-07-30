@@ -33,7 +33,8 @@ def evaluate_similarity(groundtruth, converted, eval):
         format="librispeech",
         eval_csv=eval,
         converted_dir=converted,
-        groundtruth_dir=groundtruth
+        groundtruth_dir=groundtruth,
+        zero_positive = 0
     )
     similarity.speaker_similarity(args)
 
