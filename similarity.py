@@ -61,7 +61,7 @@ def speaker_similarity(args):
     classifier = EncoderClassifier.from_hparams(
         source="speechbrain/spkrec-xvect-voxceleb",
         savedir="pretrained_models/spkrec-xvect-voxceleb",
-        run_opts={"device": "cuda"},
+        run_opts={"device": "cpu"},
     )
     pairs = pandas.read_csv(args.eval_csv)
     # print(pairs)
