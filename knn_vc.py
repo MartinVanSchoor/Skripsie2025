@@ -126,7 +126,7 @@ def main():
     
 ### Specify filenames and other variables
  ## For Laptop
-    device = "cpu"
+    # device = "cpu"
     # Target 
     target_wav_filename = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target3_obama.wav"
     target_feat_filename = "data/target/rfk2_5.pt"
@@ -142,7 +142,7 @@ def main():
     output_dir_S = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/similarity_libri/180")
     targets_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/librispeech_target_feats/180")
  ## For Desktop
-    # device = "cuda"
+    device = "cuda"
     
 ### Load in the neccessary models {SSL feature extractor (WavLM) and Vocoder (HiFi-GAN)}
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)

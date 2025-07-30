@@ -34,6 +34,7 @@ def main(target_length, subpath):
                 break
 
         start = time.time()
+        audio = audio.to(dev)
         chunk_length = largest_divisor_in_range(audio.shape[1])
         chunk_list = []
         for i in range(audio.shape[1] // chunk_length):
