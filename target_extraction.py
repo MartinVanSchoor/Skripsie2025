@@ -12,9 +12,9 @@ def largest_divisor_in_range(n, low=1, high=800_000):
             return d
 
 def main(target_length, subpath):
-    dev = "cpu"
-    target_dir_og = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/LibriSpeech/test-clean")
-    target_dir_new = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/librispeech_target_feat/{subpath}")
+    dev = "cuda"
+    target_dir_og = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/LibriSpeech/dev-clean")
+    target_dir_new = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_target_feat/{subpath}")
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=dev)
 
     for speaker_dir in tqdm(sorted(target_dir_og.iterdir()), desc="Processing speakers"):
