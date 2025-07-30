@@ -16,7 +16,6 @@ ENV/
 # PyTorch / TensorFlow checkpoints
 *.ckpt
 *.pth
-*.pt
 *.h5
 *.tflite
 checkpoints/
@@ -29,7 +28,6 @@ output/
 outputs/
 
 # Audio files
-*.wav
 *.flac
 *.mp3
 audio/
