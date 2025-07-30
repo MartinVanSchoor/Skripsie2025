@@ -66,7 +66,7 @@ def main(args):
     for wav_fn in tqdm(sorted(args.converted_dir.rglob("*.wav"))):
         transcript_hat = model.transcribe(str(wav_fn), language="english")
         predictions.append(transcript_hat["text"])
-        transcript_key = wav_fn.stem
+        transcript_key = wav_fn.parent.stem
         labels.append(transcript[transcript_key])
 
     # WER: Bootstrap confidence interval
@@ -128,9 +128,6 @@ def main(args):
     cer_mean = np.mean(cers) * 100
     cer_std = np.std(cers) * 100
     print(f"CER: {cer_mean:.2f}% +- {cer_std:.2f}%")
-    
-    # Return results
-    return wer_mean, wer_std, cer_mean, cer_std
 
 
 if __name__ == "__main__":
