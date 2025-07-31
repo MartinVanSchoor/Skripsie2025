@@ -137,7 +137,7 @@ def speaker_similarity(args):
     )
     eer_stats = sim.agg(mean=("eer", np.mean), std=("eer", np.std))
     print(eer_stats)
-    return eer_stats["mean"], eer_stats["std"]
+    return eer_stats.loc["mean", "eer"], eer_stats.loc["std", "eer"]
         
 
 
