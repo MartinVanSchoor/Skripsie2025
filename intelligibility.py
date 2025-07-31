@@ -57,7 +57,7 @@ def main(args):
                 transcript[line[0]] = " ".join(line[1:])
 
     # ASR
-    model = whisper.load_model(args.whisper, device="cpu")
+    model = whisper.load_model(args.whisper, device="cuda")
     print("Whisper loaded successfully")
 
     print("Reading:", args.converted_dir)
