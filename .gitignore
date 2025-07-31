@@ -24,6 +24,7 @@ logs/
 output/
 outputs/
 # Audio files
+.wav
 *.flac
 *.mp3
 audio/
@@ -40,6 +41,7 @@ Thumbs.db
 # VSCode
 .vscode/
 # Data
+.pt
 data/
 dataset/
 *.tar
