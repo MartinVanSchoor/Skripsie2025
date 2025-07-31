@@ -57,7 +57,7 @@ def main(args):
                 transcript[line[0]] = " ".join(line[1:])
 
     # ASR
-    model = whisper.load_model(args.whisper, device="cpu")
+    model = whisper.load_model(args.whisper, device="cuda")
     print("Whisper loaded successfully")
 
     print("Reading:", args.converted_dir)
@@ -128,6 +128,8 @@ def main(args):
     cer_mean = np.mean(cers) * 100
     cer_std = np.std(cers) * 100
     print(f"CER: {cer_mean:.2f}% +- {cer_std:.2f}%")
+    
+    return wer_mean, wer_std, cer_mean, cer_std
 
 
 if __name__ == "__main__":

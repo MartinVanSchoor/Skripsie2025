@@ -22,7 +22,7 @@ import torch
 import torchaudio
 import torchaudio.functional as F
 
-device = "cpu"
+device = "cuda"
 
 def check_argv():
     parser = argparse.ArgumentParser(description=__doc__.strip().split("\n")[0])
@@ -61,12 +61,12 @@ def speaker_similarity(args):
     classifier = EncoderClassifier.from_hparams(
         source="speechbrain/spkrec-xvect-voxceleb",
         savedir="pretrained_models/spkrec-xvect-voxceleb",
-        run_opts={"device": "cpu"},
+        run_opts={"device": "cuda"},
     )
     pairs = pandas.read_csv(args.eval_csv)
     # print(pairs)
     converted_pairs = pairs[pairs.label == 0]
-    groundtruth_paris = pairs[pairs.label == 1]
+    groundtruth_pairs = pairs[pairs.label == 1]
     scores = []
     # Converted similarities
     for _, (
@@ -103,10 +103,10 @@ def speaker_similarity(args):
         source_key,
         target_key,
         label,
-    ) in tqdm(list(groundtruth_paris.iterrows())):
+    ) in tqdm(list(groundtruth_pairs.iterrows())):
         source_wav_fn = (args.groundtruth_dir / source_key).with_suffix(
             ".flac"
-        )
+        )   
         target_wav_fn = (args.groundtruth_dir / target_key).with_suffix(
             ".flac"
         )
@@ -135,7 +135,10 @@ def speaker_similarity(args):
         .apply(lambda x: eer(x.label, x.score))
         .reset_index(name="eer")
     )
-    print(sim.agg(mean=("eer", np.mean), std=("eer", np.std)))
+    eer_stats = sim.agg(mean=("eer", np.mean), std=("eer", np.std))
+    print(eer_stats)
+    return eer_stats["mean"], eer_stats["std"]
+        
 
 
 if __name__ == "__main__":
