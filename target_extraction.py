@@ -6,15 +6,15 @@ import argparse
 from pathlib import Path
 from tqdm import tqdm
 
-def largest_divisor_in_range(n, low=1, high=800_000):
+def largest_divisor_in_range(n, low=1, high=1_000_000):
     for d in range(high, low - 1, -1):
         if n % d == 0:
             return d
 
 def main(target_length, subpath):
     dev = "cpu"
-    target_dir_og = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/LibriSpeech/dev-clean")
-    target_dir_new = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/librispeech_target_feats/{subpath}")
+    target_dir_og = Path("/home/martinvs/librispeech_data/LibriSpeech/train-clean-100")
+    target_dir_new = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train_100")
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=dev)
 
     for speaker_dir in tqdm(sorted(target_dir_og.iterdir()), desc="Processing speakers"):
@@ -22,23 +22,33 @@ def main(target_length, subpath):
             continue
 
         speaker_name = speaker_dir.name
-        audio = torch.empty(1, 0) 
+        speaker_out_dir = target_dir_new / speaker_name
+        out_path = speaker_out_dir / f"{speaker_name}.pt"
+
+        if out_path.exists():
+            print(f"Skipping {speaker_name}, already processed.")
+            continue
+
+        audio = torch.empty(1, 0)
         
         flac_files = sorted(speaker_dir.rglob("*.flac"))
         
         for flac_path in flac_files:
             waveform, sr = torchaudio.load(flac_path)
             audio = torch.cat([audio, waveform], dim=1)
-            if audio.shape[1] >= target_length:
-                audio = audio[:, :target_length]
-                break
+            # For specific amount of audio
+            # if audio.shape[1] >= target_length:
+            #     audio = audio[:, :target_length]
+            #     break
 
         start = time.time()
         audio = audio.to(dev)
-        chunk_length = largest_divisor_in_range(audio.shape[1])
+        chunk_length = 80000
         chunk_list = []
-        for i in range(audio.shape[1] // chunk_length):
-            chunk = audio[:, i * chunk_length : (i + 1) * chunk_length]
+        for i in range(0, audio.shape[1], chunk_length):
+            chunk = audio[:, i : i + chunk_length]
+            if chunk.shape[1] < 100:
+                continue  # too short for WavLM
             with torch.inference_mode():
                 chunk_features, _ = wavlm.extract_features(chunk, output_layer=6)
             chunk_features = chunk_features.squeeze()
