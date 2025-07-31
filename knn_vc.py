@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from torch import Tensor
 import torchaudio
 from sklearn.neighbors import NearestNeighbors
 import torchaudio.functional as F
@@ -17,6 +18,28 @@ def largest_divisor_in_range(n, low=1, high=800_000):
     for d in range(high, low - 1, -1):
         if n % d == 0:
             return d
+        
+def fast_cosine_dist(
+    source_feats: Tensor, matching_pool: Tensor, device: str = "cpu"
+) -> Tensor:
+    """
+    Like torch.cdist, but fixed dim=-1 and for cosine distance.
+
+    Based on:
+    <https://github.com/bshall/knn-vc/blob/master/matcher.py>
+    """
+    source_norms = torch.norm(source_feats, p=2, dim=-1).to(device)
+    matching_norms = torch.norm(matching_pool, p=2, dim=-1)
+    dotprod = (
+        -torch.cdist(source_feats[None].to(device), matching_pool[None], p=2)[0]
+        ** 2
+        + source_norms[:, None] ** 2
+        + matching_norms[None] ** 2
+    )
+    dotprod /= 2
+
+    dists = 1 - (dotprod / (source_norms[:, None] * matching_norms[None]))
+    return dists
         
 def evaluate_intelligibility(groundtruth, converted):
     args = SimpleNamespace(
@@ -36,7 +59,8 @@ def evaluate_similarity(groundtruth, converted, eval):
         groundtruth_dir=groundtruth,
         zero_positive = 0
     )
-    similarity.speaker_similarity(args)
+    eer_mean, eer_std = similarity.speaker_similarity(args)
+    return eer_mean, eer_std
 
 class kNN_VC(torch.nn.Module):
     def __init__(self, wavlm, hifigan, k, device="cpu"):
@@ -128,12 +152,14 @@ def main(target_length):
 ### Specify filenames and other variables
  ## For Laptop
     # device = "cpu"
+    # perf = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/performance/07-31-2025.txt"
     # eval_csv = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/eval.csv")
     # librispeech_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/Librispeech/dev-clean")
     # targets_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/librispeech_target_feats/{target_length}")
     # output_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/converted/{target_length}")
  ## For Desktop
     device = "cuda"
+    perf = "/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/performance/07-31-2025.txt"
     eval_csv = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/eval.csv")
     librispeech_dir = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/Librispeech/dev-clean")
     targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_target_feats/{target_length}")
@@ -199,10 +225,18 @@ def main(target_length):
     print(f"Finished all conversions in time: {(end - start)/60:.2f} minutes")
     
 ### Performance evaluation
-    # print("Evaluating similarity")
-    # evaluate_similarity(librispeech_dir, output_dir, eval_csv)
-    # print("Evaluating intelligibility")
-    # evaluate_intelligibility(librispeech_dir, output_dir)
+    print("Evaluating similarity")
+    eer_mean, eer_std = evaluate_similarity(librispeech_dir, output_dir, eval_csv)
+    print("Evaluating intelligibility")
+    wer_mean, wer_std, cer_mean, cer_std = evaluate_intelligibility(librispeech_dir, output_dir)
+    with open(perf, "a") as f:
+        f.write(f"The performance of the kNN_VC model for {target_length} seconds of target audio is:\n")
+        f.write("Intelligiblity:\n")
+        f.write(f"WER: {wer_mean} +- {wer_std}\n")
+        f.write(f"CER: {cer_mean} +- {cer_std}\n")
+        f.write("Similarity:\n")
+        f.write(f"EER: {eer_mean} +- {eer_std}\n")
+        f.write("\n")
 
 if __name__ == "__main__":
     import argparse

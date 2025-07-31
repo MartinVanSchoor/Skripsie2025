@@ -135,7 +135,10 @@ def speaker_similarity(args):
         .apply(lambda x: eer(x.label, x.score))
         .reset_index(name="eer")
     )
-    print(sim.agg(mean=("eer", np.mean), std=("eer", np.std)))
+    eer_stats = sim.agg(mean=("eer", np.mean), std=("eer", np.std))
+    print(eer_stats)
+    return eer_stats["mean"], eer_stats["std"]
+        
 
 
 if __name__ == "__main__":
