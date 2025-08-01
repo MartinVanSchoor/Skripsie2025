@@ -47,12 +47,20 @@ def main(target_length, subpath):
         chunk_list = []
         for i in range(0, audio.shape[1], chunk_length):
             chunk = audio[:, i : i + chunk_length]
-            if chunk.shape[1] < 100:
-                continue  # too short for WavLM
-            with torch.inference_mode():
-                chunk_features, _ = wavlm.extract_features(chunk, output_layer=6)
-            chunk_features = chunk_features.squeeze()
-            chunk_list.append(chunk_features)
+
+            # Check if chunk is too short
+            if chunk.shape[1] < 10:
+                print(f"Skipping chunk of size {chunk.shape[1]} from speaker {speaker_name}")
+                continue
+
+            try:
+                with torch.inference_mode():
+                    chunk_features, _ = wavlm.extract_features(chunk, output_layer=6)
+                chunk_features = chunk_features.squeeze()
+                chunk_list.append(chunk_features)
+            except Exception as e:
+                print(f"Failed to process chunk from speaker {speaker_name}, size={chunk.shape[1]}: {e}")
+                continue
         target_features = torch.cat(chunk_list, dim=0)
         print(f"Extracted {target_features.shape[0]} features from speaker {speaker_name}")
         print(f"Extraction took {time.time() - start:.4f} seconds")
