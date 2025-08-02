@@ -12,10 +12,16 @@ def largest_divisor_in_range(n, low=1, high=1_000_000):
             return d
 
 def main(target_length, subpath):
-    dev = "cpu"
-    target_dir_og = Path("/home/martinvs/librispeech_data/LibriSpeech/train-clean-100")
-    target_dir_new = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train_100")
+### Laptop
+    # dev = "cpu"
+    # target_dir_og = Path("/home/martinvs/librispeech_data/LibriSpeech/train-clean-100")
+    # target_dir_new = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train_100")
+### Desktop
+    dev = "cuda"
+    target_dir_og = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/Librispeech/test-clean")
+    target_dir_new = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_target_feats/test/180")
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=dev)
+
 
     for speaker_dir in tqdm(sorted(target_dir_og.iterdir()), desc="Processing speakers"):
         if not speaker_dir.is_dir():
@@ -37,13 +43,15 @@ def main(target_length, subpath):
             waveform, sr = torchaudio.load(flac_path)
             audio = torch.cat([audio, waveform], dim=1)
             # For specific amount of audio
-            # if audio.shape[1] >= target_length:
-            #     audio = audio[:, :target_length]
-            #     break
+            if audio.shape[1] >= target_length:
+                audio = audio[:, :target_length]
+                break
+        length = audio.shape[1] / 960000
+        print(f"Accumulated {length} mins of audio") 
 
         start = time.time()
         audio = audio.to(dev)
-        chunk_length = 80000
+        chunk_length = 1440000
         chunk_list = []
         for i in range(0, audio.shape[1], chunk_length):
             chunk = audio[:, i : i + chunk_length]
@@ -56,12 +64,19 @@ def main(target_length, subpath):
             try:
                 with torch.inference_mode():
                     chunk_features, _ = wavlm.extract_features(chunk, output_layer=6)
-                chunk_features = chunk_features.squeeze()
+                if chunk_features.dim() == 3:
+                    chunk_features = chunk_features.squeeze(0)  # remove batch dimension only
+                elif chunk_features.dim() == 2:
+                    pass  # already fine
+                else:
+                    print(f"Unexpected shape: {chunk_features.shape}")
+                    continue
                 chunk_list.append(chunk_features)
             except Exception as e:
                 print(f"Failed to process chunk from speaker {speaker_name}, size={chunk.shape[1]}: {e}")
                 continue
         target_features = torch.cat(chunk_list, dim=0)
+        print(target_features.shape)
         print(f"Extracted {target_features.shape[0]} features from speaker {speaker_name}")
         print(f"Extraction took {time.time() - start:.4f} seconds")
         
@@ -76,7 +91,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--target_length",
         type=int,
-        default=2800000,
+        default=2880000,
         help="Target length (in samples) of audio to extract features from (default: 2800000)"
     )
     parser.add_argument(
