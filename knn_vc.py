@@ -19,28 +19,6 @@ def largest_divisor_in_range(n, low=1, high=800_000):
         if n % d == 0:
             return d
         
-def fast_cosine_dist(
-    source_feats: Tensor, matching_pool: Tensor, device: str = "cpu"
-) -> Tensor:
-    """
-    Like torch.cdist, but fixed dim=-1 and for cosine distance.
-
-    Based on:
-    <https://github.com/bshall/knn-vc/blob/master/matcher.py>
-    """
-    source_norms = torch.norm(source_feats, p=2, dim=-1).to(device)
-    matching_norms = torch.norm(matching_pool, p=2, dim=-1)
-    dotprod = (
-        -torch.cdist(source_feats[None].to(device), matching_pool[None], p=2)[0]
-        ** 2
-        + source_norms[:, None] ** 2
-        + matching_norms[None] ** 2
-    )
-    dotprod /= 2
-
-    dists = 1 - (dotprod / (source_norms[:, None] * matching_norms[None]))
-    return dists
-        
 def evaluate_intelligibility(groundtruth, converted):
     args = SimpleNamespace(
         format="librispeech",
