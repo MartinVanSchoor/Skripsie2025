@@ -7,13 +7,13 @@ from tqdm import tqdm
 
 def main():
 ### Laptop
-    dev = "cpu"
-    librispeech_dir = Path("/home/martinvs/librispeech_data/LibriSpeech/train-clean-100")
-    target_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train_100")
+    # dev = "cpu"
+    # librispeech_dir = Path("/home/martinvs/librispeech_data/LibriSpeech/train-clean-100")
+    # target_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train_100")
 ### Desktop
-    # dev = "cuda"
-    # target_dir_og = Path("/home/martin/librispeech_data/LibriSpeech/train-clean-100")
-    # target_dir_new = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train_360")
+    dev = "cuda"
+    librispeech_dir = Path("/home/martin/librispeech_data/LibriSpeech/train-clean-360")
+    target_dir = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train_360")
 ### Speaker identity model
     classifier = EncoderClassifier.from_hparams(
         source="speechbrain/spkrec-xvect-voxceleb",
@@ -52,6 +52,7 @@ def main():
         # Extract speaker identity vector and save to .pt file
         audio = audio.to(dev)  
         x = classifier.encode_batch(audio).squeeze().cpu()
+        speaker_out_dir.mkdir(parents=True, exist_ok=True)
         torch.save(x, out_path)
                   
             

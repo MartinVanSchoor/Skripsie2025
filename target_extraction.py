@@ -80,9 +80,7 @@ def main(target_length, subpath):
         print(f"Extracted {target_features.shape[0]} features from speaker {speaker_name}")
         print(f"Extraction took {time.time() - start:.4f} seconds")
         
-        speaker_out_dir = target_dir_new / speaker_name
         speaker_out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = speaker_out_dir / f"{speaker_name}.pt"
         torch.save(target_features, out_path)
         print(f"Saved: {out_path}")
 
