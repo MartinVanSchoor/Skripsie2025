@@ -18,8 +18,8 @@ def main(target_length, subpath):
     # target_dir_new = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train_100")
 ### Desktop
     dev = "cuda"
-    target_dir_og = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/Librispeech/test-clean")
-    target_dir_new = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_target_feats/test/180")
+    target_dir_og = Path("/home/martin/librispeech_data/Librispeech/train-clean-360")
+    target_dir_new = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train_360")
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=dev)
 
 
@@ -42,16 +42,16 @@ def main(target_length, subpath):
         for flac_path in flac_files:
             waveform, sr = torchaudio.load(flac_path)
             audio = torch.cat([audio, waveform], dim=1)
-            # For specific amount of audio
-            if audio.shape[1] >= target_length:
-                audio = audio[:, :target_length]
-                break
+            # # For specific amount of audio
+            # if audio.shape[1] >= target_length:
+            #     audio = audio[:, :target_length]
+            #     break
         length = audio.shape[1] / 960000
         print(f"Accumulated {length} mins of audio") 
 
         start = time.time()
         audio = audio.to(dev)
-        chunk_length = 1440000
+        chunk_length = 80000
         chunk_list = []
         for i in range(0, audio.shape[1], chunk_length):
             chunk = audio[:, i : i + chunk_length]

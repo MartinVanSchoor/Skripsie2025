@@ -147,7 +147,7 @@ class kNN_VC(torch.nn.Module):
         output_features = torch.from_numpy(averaged).to(self.device)   
         return output_features
         
-def main(target_length):
+def main(target_length, set):
     
 ### Specify filenames and other variables
  ## For Laptop
@@ -160,10 +160,10 @@ def main(target_length):
  ## For Desktop
     device = "cuda"
     perf = "/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/performance/08-02-2025.txt"
-    eval_csv = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/eval_test.csv")
-    librispeech_dir = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/Librispeech/test-clean")
-    targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_target_feats/test/{target_length}")
-    output_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/converted/test/{target_length}")
+    eval_csv = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/eval_{set}.csv")
+    librispeech_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/Librispeech/{set}-clean")
+    targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_target_feats/{set}/{target_length}")
+    output_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/converted/{set}/{target_length}")
     
 ### Load in the neccessary models {SSL feature extractor (WavLM) and Vocoder (HiFi-GAN)}
     # wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
@@ -230,7 +230,7 @@ def main(target_length):
     print("Evaluating intelligibility")
     wer_mean, wer_std, cer_mean, cer_std = evaluate_intelligibility(librispeech_dir, output_dir)
     with open(perf, "a") as f:
-        f.write(f"The performance of the kNN_VC model for {target_length} seconds of target audio is:\n")
+        f.write(f"The performance of the kNN_VC model for {target_length} seconds of target audio from the {set}-clean set is:\n")
         f.write("Intelligiblity:\n")
         f.write(f"WER: {wer_mean} +- {wer_std}\n")
         f.write(f"CER: {cer_mean} +- {cer_std}\n")
@@ -242,5 +242,6 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--target_length', type=int, default=180, help='Target length for features')
+    parser.add_argument('--set', type=str, default="dev", help='Librispeech set to use')
     args = parser.parse_args()
-    main(args.target_length)
+    main(args.target_length, args.set)
