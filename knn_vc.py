@@ -144,7 +144,7 @@ class kNN_VC(torch.nn.Module):
         return output_features
     
     @torch.inference_mode()
-    def expand_feature_space(self, target_id_dir, target_features, train_data_ids, train_data_speakers):
+    def expand_feature_space(self, target_id_dir, target_features, train_dir, train_ids, train_speakers):
         """ 
         Expands the source speaker's feature space by sampling from
         the most similar speaker in the librispeech train-clean set
@@ -152,13 +152,21 @@ class kNN_VC(torch.nn.Module):
         # Load target speaker id
         x = torch.load(target_id_dir)
 
-        # Find most similar speaker
+        # Find most similar speaker and retrieve features
+        closest_speaker = kNN_VC.find_most_similar_speaker(x, train_ids, train_speakers)
+        print(f"Closest speaker is: {closest_speaker}, loading features...")
+        feat_dir = train_dir / closest_speaker / f"{closest_speaker}.pt"
+        train_features = torch.load(feat_dir)
+        print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
+        
+        # Add features to target features to obtain roughly 3 mins worth of features
+        diff = 8996 - target_features.shape[0]
+        expanded_features = torch.cat([target_features, train_features[0 : diff, :]], dim=0)
 
-
-        return
+        return expanded_features
     
     @torch.inference_mode()
-    def find_most_similar_speaker(self, x: torch.Tensor, y: torch.Tensor):
+    def find_most_similar_speaker(x: torch.Tensor, y: torch.Tensor, speakers):
         """ 
         Finds the most similar speaker to x in the train-clean set 
         using fast cosine similarity 
@@ -172,11 +180,9 @@ class kNN_VC(torch.nn.Module):
         # Compute cosine similarities
         similarities = torch.matmul(y_norm, x_norm)  
 
-        # Return index and value of most similar speaker
-        max_sim, best_idx = torch.max(similarities, dim=0)
-
-
-        return
+        # Find most similar speaker and return
+        _, best_idx = torch.max(similarities, dim=0)
+        return speakers[best_idx.item()]
         
 def main(target_length, set):
     
@@ -248,12 +254,14 @@ def main(target_length, set):
                 target_fn = targets_dir / target / feat_fn_with_suffix
                 target_id_fn = targets_dir / target / id_fn_with_suffix
                 target_features = torch.load(target_fn)
+                target_features = target_features.to(device)
                 print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
 
                 # If the target features are too few, expand the feature space
-                # if (target_length < 180):
-                
-                break
+                if (target_length < 180):
+                    print(f"Insufficient target data, finding closest speaker to speaker {target}...")
+                    target_features = vc_model.expand_feature_space(target_id_fn, target_features, train_dir, ids, speakers)
+                    print(target_features.shape)
                 
                 # Perform kNN matching to get output features
                 print("Performing kNN matching...")
