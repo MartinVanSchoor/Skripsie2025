@@ -10,7 +10,6 @@ import similarity
 from types import SimpleNamespace
 from pathlib import Path
 from tqdm import tqdm
-from speechbrain.inference.speaker import EncoderClassifier
 import torch.nn.functional as F
 
 n_frames = None
@@ -145,31 +144,31 @@ class kNN_VC(torch.nn.Module):
         return output_features
     
     @torch.inference_mode()
-    def expand_feature_space(target_dir, target_features, train_data_dir):
+    def expand_feature_space(target_id_dir, target_features, train_data_dir):
         """ 
         Expands the source speaker's feature space by sampling from
         the most similar speaker in the librispeech train-clean set
         """
-        # Extract speaker identity from source 
+        # Load target speaker id
+        x = torch.load(target_id_dir)
 
         return
     
     @torch.inference_mode()
-    def get_speaker_identity(target_dir):
-        """ 
-        Extracts and returns the speaker identity vector using 
-        spkrec-xvect-voxceleb from speechbrain 
-        """
-
-        return
-    
-    @torch.inference_mode()
-    def find_most_similar_speaker(data_dir, x):
+    def find_most_similar_speaker(data_dir):
         """ 
         Finds the most similar speaker to x in the train-clean set 
-        using cosine distance 
+        using fast cosine similarity 
         """
-
+        # Load in the training set speaker id's 
+        ids = torch.empty(0, 512)
+        for speaker_dir in tqdm(sorted(data_dir.iterdir()), desc="Loading training id's"):
+            speaker_name = speaker_dir.name
+            speaker_id_fn = speaker_dir / f"{speaker_name}_id.pt"
+            id = torch.load(speaker_id_fn)
+            id = id.unsqueeze(0)
+            ids = torch.cat([ids, id], dim=0)
+        print(ids.shape)
         return
         
 def main(target_length, set):
@@ -180,7 +179,7 @@ def main(target_length, set):
     # perf = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/performance/08-05-2025.txt"
     # eval_csv = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/eval.csv")
     # librispeech_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/Librispeech/dev-clean")
-    # targets_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/librispeech_target_feats/{target_length}")
+    # targets_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/librispeech_targets/{target_length}")
     # output_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/converted/{target_length}")
     # train_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train")
  ## For Desktop
@@ -188,18 +187,13 @@ def main(target_length, set):
     perf = "/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/performance/08-05-2025.txt"
     eval_csv = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/eval_{set}.csv")
     librispeech_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/Librispeech/{set}-clean")
-    targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_target_feats/{set}/{target_length}")
+    targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/{set}/{target_length}")
     output_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/converted/{set}/{target_length}")
     train_dir = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train")
     
 ### Load in the neccessary models {SSL feature extractor (WavLM) and Vocoder (HiFi-GAN)}
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
     hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
-    classifier = EncoderClassifier.from_hparams(
-        source="speechbrain/spkrec-xvect-voxceleb",
-        savedir="pretrained_models/spkrec-xvect-voxceleb",
-        run_opts={"device": device},
-    )
     
 ### Timing start and model initialization
     start = time.time()
@@ -225,7 +219,6 @@ def main(target_length, set):
                 clip = source_key.split("/")[0]
                 print(f"Converting speaker {source} clip: {clip} to speaker {target}")
                 
-                
                 # Extract features for source
                 print("Extracting source features...")
                 source_features = vc_model.get_features(source_wav_fn, mode=1)
@@ -233,10 +226,17 @@ def main(target_length, set):
                 
                 # Load target features from .pt file
                 print("Loading in target features...")
-                filename_with_suffix = target + ".pt"
-                target_fn = targets_dir / target / filename_with_suffix
+                feat_fn_with_suffix = target + ".pt"
+                id_fn_with_suffix = target + "_id.pt"
+                target_fn = targets_dir / target / feat_fn_with_suffix
+                target_id_fn = targets_dir / target / id_fn_with_suffix
                 target_features = torch.load(target_fn)
                 print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
+
+                # If the target features are too few, expand the feature space
+                # if (target_features.shape[0] < 8990):
+                kNN_VC.find_most_similar_speaker(train_dir)
+                break
                 
                 # Perform kNN matching to get output features
                 print("Performing kNN matching...")
