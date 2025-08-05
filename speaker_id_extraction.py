@@ -5,15 +5,15 @@ from pathlib import Path
 from tqdm import tqdm
 
 
-def main():
+def main(target_length, set):
 ### Laptop
     # dev = "cpu"
     # librispeech_dir = Path("/home/martinvs/librispeech_data/LibriSpeech/train-clean-100")
     # target_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train_100")
 ### Desktop
     dev = "cuda"
-    librispeech_dir = Path("/home/martin/librispeech_data/LibriSpeech/train-clean-360")
-    target_dir = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train_360")
+    librispeech_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/LibriSpeech/{set}-clean")
+    target_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/{set}/{target_length}")
 ### Speaker identity model
     classifier = EncoderClassifier.from_hparams(
         source="speechbrain/spkrec-xvect-voxceleb",
@@ -58,7 +58,12 @@ def main():
             
     
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--target_length', type=int, default=180, help='Target length for features')
+    parser.add_argument('--set', type=str, default="dev", help='Librispeech set to use')
+    args = parser.parse_args()
+    main(args.target_length, args.set)
         
         
         

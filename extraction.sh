@@ -1,7 +1,7 @@
-python3 target_extraction.py --target_length 2880000 --path 180
-python3 target_extraction.py --target_length 2880000 --path 180
-python3 target_extraction.py --target_length 2880000 --path 180
-python3 target_extraction.py --target_length 2880000 --path 180
-python3 target_extraction.py --target_length 2880000 --path 180
-python3 target_extraction.py --target_length 2880000 --path 180
-python3 target_extraction.py --target_length 2880000 --path 180
+python3 speaker_id_extraction.py --target_length 180 --set dev
+python3 speaker_id_extraction.py --target_length 90 --set dev
+python3 speaker_id_extraction.py --target_length 45 --set dev
+python3 speaker_id_extraction.py --target_length 24 --set dev
+python3 speaker_id_extraction.py --target_length 12 --set dev
+python3 speaker_id_extraction.py --target_length 6 --set dev
+python3 speaker_id_extraction.py --target_length 3 --set dev

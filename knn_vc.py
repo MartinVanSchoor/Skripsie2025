@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from pathlib import Path
 from tqdm import tqdm
 from speechbrain.inference.speaker import EncoderClassifier
+import torch.nn.functional as F
 
 n_frames = None
 k_top = 4
@@ -19,6 +20,23 @@ def largest_divisor_in_range(n, low=1, high=800_000):
     for d in range(high, low - 1, -1):
         if n % d == 0:
             return d
+        
+def fast_cosine_sim(x: torch.Tensor, y: torch.Tensor):
+    """
+    x: [D]           — query vector
+    y: [N, D]        — dataset of vectors to compare against
+    Returns:
+        max_sim:     — maximum cosine similarity
+        best_idx:    — index of most similar vector in y
+    """
+    x_norm = F.normalize(x, dim=0)          # [D]
+    y_norm = F.normalize(y, dim=1)          # [N, D]
+    
+    # Compute cosine similarities
+    similarities = torch.matmul(y_norm, x_norm)  # [N]
+    
+    max_sim, best_idx = torch.max(similarities, dim=0)
+    return max_sim.item(), best_idx.item()
         
 def evaluate_intelligibility(groundtruth, converted):
     args = SimpleNamespace(
@@ -127,35 +145,52 @@ class kNN_VC(torch.nn.Module):
         return output_features
     
     @torch.inference_mode()
-    def expand_feature_space(source_dir, source_features, train_data_dir):
+    def expand_feature_space(target_dir, target_features, train_data_dir):
+        """ 
+        Expands the source speaker's feature space by sampling from
+        the most similar speaker in the librispeech train-clean set
+        """
         # Extract speaker identity from source 
+
         return
     
     @torch.inference_mode()
-    def get_speaker_identity(source_dir):
+    def get_speaker_identity(target_dir):
+        """ 
+        Extracts and returns the speaker identity vector using 
+        spkrec-xvect-voxceleb from speechbrain 
+        """
+
         return
     
     @torch.inference_mode()
-    def find_most_similar_speaker(data_dir):
+    def find_most_similar_speaker(data_dir, x):
+        """ 
+        Finds the most similar speaker to x in the train-clean set 
+        using cosine distance 
+        """
+
         return
         
 def main(target_length, set):
     
 ### Specify filenames and other variables
  ## For Laptop
-    device = "cpu"
-    perf = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/performance/08-05-2025.txt"
-    eval_csv = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/eval.csv")
-    librispeech_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/Librispeech/dev-clean")
-    targets_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/librispeech_target_feats/{target_length}")
-    output_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/converted/{target_length}")
+    # device = "cpu"
+    # perf = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/performance/08-05-2025.txt"
+    # eval_csv = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/eval.csv")
+    # librispeech_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/Librispeech/dev-clean")
+    # targets_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/librispeech_target_feats/{target_length}")
+    # output_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/converted/{target_length}")
+    # train_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train")
  ## For Desktop
-    # device = "cuda"
-    # perf = "/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/performance/08-05-2025.txt"
-    # eval_csv = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/eval_{set}.csv")
-    # librispeech_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/Librispeech/{set}-clean")
-    # targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_target_feats/{set}/{target_length}")
-    # output_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/converted/{set}/{target_length}")
+    device = "cuda"
+    perf = "/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/performance/08-05-2025.txt"
+    eval_csv = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/eval_{set}.csv")
+    librispeech_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/Librispeech/{set}-clean")
+    targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_target_feats/{set}/{target_length}")
+    output_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/converted/{set}/{target_length}")
+    train_dir = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train")
     
 ### Load in the neccessary models {SSL feature extractor (WavLM) and Vocoder (HiFi-GAN)}
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
@@ -171,52 +206,53 @@ def main(target_length, set):
     vc_model = kNN_VC(wavlm, hifigan, k_top, device)
 
 ### Conversion of librispeech dev-clean set data according to eval.csv 
-    # output_dir.mkdir(parents=True, exist_ok=True)
-    # print("Writing to:", output_dir)
-    # with open(eval_csv) as f:
-    #     for line in tqdm(f.readlines()):
-    #         line = line.strip()
-    #         if line[-1] == "0":
+    output_dir.mkdir(parents=True, exist_ok=True)
+    print("Writing to:", output_dir)
+    with open(eval_csv) as f:
+        for line in tqdm(f.readlines()):
+            line = line.strip()
+            if line[-1] == "0":
                 
-    #             # Set up filepath and source and target variables
-    #             (source, target, source_key, _, _) = line.split(",")
-    #             source_key_split = source_key.split("-")
-    #             source_wav_fn = (
-    #                 librispeech_dir
-    #                 / source_key_split[0]
-    #                 / source_key_split[1]
-    #                 / source_key.split("/")[0]
-    #             ).with_suffix(".flac")
-    #             clip = source_key.split("/")[0]
-    #             print(f"Converting speaker {source} clip: {clip} to speaker {target}")
+                # Set up filepath and source and target variables
+                (source, target, source_key, _, _) = line.split(",")
+                source_key_split = source_key.split("-")
+                source_wav_fn = (
+                    librispeech_dir
+                    / source_key_split[0]
+                    / source_key_split[1]
+                    / source_key.split("/")[0]
+                ).with_suffix(".flac")
+                clip = source_key.split("/")[0]
+                print(f"Converting speaker {source} clip: {clip} to speaker {target}")
                 
-    #             # Extract features for source
-    #             print("Extracting source features...")
-    #             source_features = vc_model.get_features(source_wav_fn, mode=1)
-    #             print(f"Extracted {source_features.shape[0]} features from source speaker: {source}")
                 
-    #             # Load target features from .pt file
-    #             print("Loading in target features...")
-    #             filename_with_suffix = target + ".pt"
-    #             target_fn = targets_dir / target / filename_with_suffix
-    #             target_features = torch.load(target_fn)
-    #             print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
+                # Extract features for source
+                print("Extracting source features...")
+                source_features = vc_model.get_features(source_wav_fn, mode=1)
+                print(f"Extracted {source_features.shape[0]} features from source speaker: {source}")
                 
-    #             # Perform kNN matching to get output features
-    #             print("Performing kNN matching...")
-    #             output_features = vc_model.knn_matching(source_features, target_features)
+                # Load target features from .pt file
+                print("Loading in target features...")
+                filename_with_suffix = target + ".pt"
+                target_fn = targets_dir / target / filename_with_suffix
+                target_features = torch.load(target_fn)
+                print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
                 
-    #             # Vocode and save the output
-    #             print("Matching complete, vocoding and saving output...")
-    #             cur_output_dir = Path(output_dir) / source_key.split("/")[0]
-    #             cur_output_dir.mkdir(parents=True, exist_ok=True)
-    #             output_fn = (cur_output_dir / source_key.split("/")[1]).with_suffix(
-    #                 ".wav"
-    #             )
-    #             output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
-    #             torchaudio.save(output_fn, output_wav[None], vc_model.sr_target)
-    #             print("Succesfully converted")
+                # Perform kNN matching to get output features
+                print("Performing kNN matching...")
+                output_features = vc_model.knn_matching(source_features, target_features)
                 
+                # Vocode and save the output
+                print("Matching complete, vocoding and saving output...")
+                cur_output_dir = Path(output_dir) / source_key.split("/")[0]
+                cur_output_dir.mkdir(parents=True, exist_ok=True)
+                output_fn = (cur_output_dir / source_key.split("/")[1]).with_suffix(
+                    ".wav"
+                )
+                output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
+                torchaudio.save(output_fn, output_wav[None], vc_model.sr_target)
+                print("Succesfully converted")
+
 ### Timing end
     end = time.time()
     print(f"Finished all conversions in time: {(end - start)/60:.2f} minutes")
