@@ -157,6 +157,7 @@ class kNN_VC(torch.nn.Module):
         print(f"Closest speaker is: {closest_speaker}, loading features...")
         feat_dir = train_dir / closest_speaker / f"{closest_speaker}.pt"
         train_features = torch.load(feat_dir)
+        train_features = train_features.to(self.device)
         print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
         
         # Add features to target features to obtain roughly 3 mins worth of features
@@ -283,18 +284,18 @@ def main(target_length, set):
     print(f"Finished all conversions in time: {(end - start)/60:.2f} minutes")
     
 ### Performance evaluation
-    # print("Evaluating similarity")
-    # eer_mean, eer_std = evaluate_similarity(librispeech_dir, output_dir, eval_csv)
-    # print("Evaluating intelligibility")
-    # wer_mean, wer_std, cer_mean, cer_std = evaluate_intelligibility(librispeech_dir, output_dir)
-    # with open(perf, "a") as f:
-    #     f.write(f"The performance of the kNN_VC model for {target_length} seconds of target audio from the {set}-clean set is:\n")
-    #     f.write("Intelligiblity:\n")
-    #     f.write(f"WER: {wer_mean} +- {wer_std}\n")
-    #     f.write(f"CER: {cer_mean} +- {cer_std}\n")
-    #     f.write("Similarity:\n")
-    #     f.write(f"EER: {eer_mean} +- {eer_std}\n")
-    #     f.write("\n")
+    print("Evaluating similarity")
+    eer_mean, eer_std = evaluate_similarity(librispeech_dir, output_dir, eval_csv)
+    print("Evaluating intelligibility")
+    wer_mean, wer_std, cer_mean, cer_std = evaluate_intelligibility(librispeech_dir, output_dir)
+    with open(perf, "a") as f:
+        f.write(f"The performance of the kNN_VC model for {target_length} seconds of target audio from the {set}-clean set is:\n")
+        f.write("Intelligiblity:\n")
+        f.write(f"WER: {wer_mean} +- {wer_std}\n")
+        f.write(f"CER: {cer_mean} +- {cer_std}\n")
+        f.write("Similarity:\n")
+        f.write(f"EER: {eer_mean} +- {eer_std}\n")
+        f.write("\n")
 
 if __name__ == "__main__":
     import argparse
