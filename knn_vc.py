@@ -187,6 +187,7 @@ class kNN_VC(torch.nn.Module):
         
 def main(target_length, set):
     
+    print(f"Using {target_length} secs of target audio for the {set} set")
 ### Specify filenames and other variables
  ## For Laptop
     # device = "cpu"
@@ -198,8 +199,8 @@ def main(target_length, set):
     # train_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train")
  ## For Desktop
     device = "cuda"
-    perf = "/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/performance/08-05-2025.txt"
-    eval_csv = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/eval_{set}.csv")
+    perf = "/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/performance/red_csv_vanilla.txt"
+    eval_csv = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/eval_trimmed.csv")
     librispeech_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/Librispeech/{set}-clean")
     targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/{set}/{target_length}")
     output_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/converted/{set}/{target_length}")
@@ -259,10 +260,10 @@ def main(target_length, set):
                 print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
 
                 # If the target features are too few, expand the feature space
-                if (target_length < 180):
-                    print(f"Insufficient target data, finding closest speaker to speaker {target}...")
-                    target_features = vc_model.expand_feature_space(target_id_fn, target_features, train_dir, ids, speakers)
-                    print(target_features.shape)
+                # if (target_length < 180):
+                #     print(f"Insufficient target data, finding closest speaker to speaker {target}...")
+                #     target_features = vc_model.expand_feature_space(target_id_fn, target_features, train_dir, ids, speakers)
+                #     print(target_features.shape)
                 
                 # Perform kNN matching to get output features
                 print("Performing kNN matching...")
