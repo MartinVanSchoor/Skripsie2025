@@ -156,13 +156,14 @@ class kNN_VC(torch.nn.Module):
         closest_speaker = kNN_VC.find_most_similar_speaker(x, train_ids, train_speakers)
         print(f"Closest speaker is: {closest_speaker}, loading features...")
         feat_dir = train_dir / closest_speaker / f"{closest_speaker}.pt"
-        train_features = torch.load(feat_dir)
-        train_features = train_features.to(self.device)
-        print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
+        train_features = torch.load(feat_dir, map_location="cpu")
+        diff = 8996 - target_features.shape[0]
+        train_features_final = train_features[0 : diff, :]
+        train_features_final = train_features.to(self.device)
+        print(f"Loaded {train_features_final.shape[0]} features from speaker {closest_speaker}")
         
         # Add features to target features to obtain roughly 3 mins worth of features
-        diff = 8996 - target_features.shape[0]
-        expanded_features = torch.cat([target_features, train_features[0 : diff, :]], dim=0)
+        expanded_features = torch.cat([target_features, train_features_final], dim=0)
 
         return expanded_features
     
@@ -247,9 +248,9 @@ def main(target_length, set):
                 output_fn = (cur_output_dir / source_key.split("/")[1]).with_suffix(
                     ".wav"
                 )
-                if output_fn.exists():
-                    print(f"Skipping {clip}, already processed.")
-                    continue
+                # if output_fn.exists():
+                #     print(f"Skipping {clip}, already processed.")
+                #     continue
                 print(f"Converting speaker {source} clip: {clip} to speaker {target}")
                 
                 # Extract features for source
@@ -268,10 +269,10 @@ def main(target_length, set):
                 print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
 
                 # If the target features are too few, expand the feature space
-                # if (target_length < 180):
-                #     print(f"Insufficient target data, finding closest speaker to speaker {target}...")
-                #     target_features = vc_model.expand_feature_space(target_id_fn, target_features, train_dir, ids, speakers)
-                #     print(target_features.shape)
+                if (target_length < 180):
+                    print(f"Insufficient target data, finding closest speaker to speaker {target}...")
+                    target_features = vc_model.expand_feature_space(target_id_fn, target_features, train_dir, ids, speakers)
+                    print(target_features.shape)
                 
                 # Perform kNN matching to get output features
                 print("Performing kNN matching...")
