@@ -248,7 +248,7 @@ def main(target_length, set):
                     ".wav"
                 )
                 if output_fn.exists():
-                    print(f"Skipping {speaker_name}, already processed.")
+                    print(f"Skipping {clip}, already processed.")
                     continue
                 print(f"Converting speaker {source} clip: {clip} to speaker {target}")
                 
