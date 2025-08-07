@@ -242,6 +242,14 @@ def main(target_length, set):
                     / source_key.split("/")[0]
                 ).with_suffix(".flac")
                 clip = source_key.split("/")[0]
+                cur_output_dir = Path(output_dir) / source_key.split("/")[0]
+                cur_output_dir.mkdir(parents=True, exist_ok=True)
+                output_fn = (cur_output_dir / source_key.split("/")[1]).with_suffix(
+                    ".wav"
+                )
+                if output_fn.exists():
+                    print(f"Skipping {speaker_name}, already processed.")
+                    continue
                 print(f"Converting speaker {source} clip: {clip} to speaker {target}")
                 
                 # Extract features for source
@@ -271,11 +279,6 @@ def main(target_length, set):
                 
                 # Vocode and save the output
                 print("Matching complete, vocoding and saving output...")
-                cur_output_dir = Path(output_dir) / source_key.split("/")[0]
-                cur_output_dir.mkdir(parents=True, exist_ok=True)
-                output_fn = (cur_output_dir / source_key.split("/")[1]).with_suffix(
-                    ".wav"
-                )
                 output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
                 torchaudio.save(output_fn, output_wav[None], vc_model.sr_target)
                 print("Succesfully converted")
