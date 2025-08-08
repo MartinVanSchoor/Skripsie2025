@@ -159,7 +159,7 @@ class kNN_VC(torch.nn.Module):
         train_features = torch.load(feat_dir, map_location="cpu")
         diff = 8996 - target_features.shape[0]
         train_features_final = train_features[0 : diff, :]
-        train_features_final = train_features.to(self.device)
+        train_features_final = train_features_final.to(self.device)
         print(f"Loaded {train_features_final.shape[0]} features from speaker {closest_speaker}")
         
         # Add features to target features to obtain roughly 3 mins worth of features
@@ -283,6 +283,7 @@ def main(target_length, set):
                 output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
                 torchaudio.save(output_fn, output_wav[None], vc_model.sr_target)
                 print("Succesfully converted")
+                # torch.cuda.empty_cache()  Use this if cuda gives problems 
 
 ### Timing end
     end = time.time()
