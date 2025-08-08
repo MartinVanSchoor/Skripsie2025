@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from pathlib import Path
 from tqdm import tqdm
 import torch.nn.functional as F
+from feature_alignment import align_features_via_clusters
 
 n_frames = None
 k_top = 4
@@ -157,29 +158,20 @@ class kNN_VC(torch.nn.Module):
         closest_speaker = kNN_VC.find_most_similar_speaker(x, train_ids, train_speakers)
         print(f"Closest speaker is: {closest_speaker}, loading features...")
         feat_dir = train_dir / closest_speaker / f"{closest_speaker}.pt"
-        train_features = torch.load(feat_dir).to(self.device)
+        train_features = torch.load(feat_dir, map_location="cpu") 
         print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
 
-        # Get means
-        A_mean = target_features.mean(dim=0, keepdim=True)  # shape: (1, 1024)
+        # Retrieve the necessary amount of features and convert to appropriate device
         diff = 8996 - target_features.shape[0]
-        B_sample = train_features[:diff]  # shape: (diff, 1024)
-        B_sample = B_sample.to(self.device)
-        B_mean = B_sample.mean(dim=0, keepdim=True)
+        train_features = train_features[:diff].to(self.device) 
+        print(f"Extracting and aligning {diff} features from speaker {closest_speaker}...")
 
-        # Interpolate
-        interpolated_mean = alpha * A_mean + (1 - alpha) * B_mean
-
-        # Add random noise to make the embeddings diverse
-        std = B_sample.std(dim=0, keepdim=True)  # use B's variation
-        noise = torch.randn(diff, 1024).to(self.device) * std
-
-        generated = interpolated_mean + noise  # shape: (diff, 1024)
+        # Align Speaker B to A's style
+        train_feats_aligned = align_features_via_clusters(train_features, target_features, n_clusters=50)
 
         # Concatenate
-        expanded_features = torch.cat([target_features, generated], dim=0)
+        expanded_features = torch.cat([target_features, train_feats_aligned], dim=0)
 
-        print(f"Expanded feature shape: {expanded_features.shape}")
         return expanded_features
     
     @torch.inference_mode()
@@ -284,10 +276,10 @@ def main(target_length, set):
                 print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
 
                 # If the target features are too few, expand the feature space
-                if (target_length < 180):
-                    print(f"Insufficient target data, finding closest speaker to speaker {target}...")
-                    target_features = vc_model.expand_feature_space(target_id_fn, target_features, train_dir, ids, speakers)
-                    print(target_features.shape)
+                # if (target_length < 180):
+                #     print(f"Insufficient target data, finding closest speaker to speaker {target}...")
+                #     target_features = vc_model.expand_feature_space(target_id_fn, target_features, train_dir, ids, speakers)
+                #     print(f"Expanded target_features to {target_features.shape[0]} features")
                 
                 # Perform kNN matching to get output features
                 print("Performing kNN matching...")
@@ -298,7 +290,7 @@ def main(target_length, set):
                 output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
                 torchaudio.save(output_fn, output_wav[None], vc_model.sr_target)
                 print("Succesfully converted")
-                # torch.cuda.empty_cache()  Use this if cuda gives problems 
+                # torch.cuda.empty_cache()  Use this if cuda gives problems with VRAM
 
 ### Timing end
     end = time.time()

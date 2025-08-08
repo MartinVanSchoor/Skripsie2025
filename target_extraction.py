@@ -18,8 +18,8 @@ def main(target_length, subpath):
     # target_dir_new = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train_100")
 ### Desktop
     dev = "cuda"
-    target_dir_og = Path("/home/martin/librispeech_data/LibriSpeech/train-clean-360")
-    target_dir_new = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train_360")
+    target_dir_og = Path("/mnt/c\Users\Martin\Documents\Werk\Universiteit\Skripsie_desktop\librispeech\LibriSpeech\dev-clean")
+    target_dir_new = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/3_expanded")
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=dev)
 
 
@@ -42,40 +42,43 @@ def main(target_length, subpath):
         for flac_path in flac_files:
             waveform, sr = torchaudio.load(flac_path)
             audio = torch.cat([audio, waveform], dim=1)
-            # # For specific amount of audio
-            # if audio.shape[1] >= target_length:
-            #     audio = audio[:, :target_length]
-            #     break
+            # For specific amount of audio
+            if audio.shape[1] >= target_length:
+                audio = audio[:, :target_length]
+                break
         length = audio.shape[1] / 960000
         print(f"Accumulated {length} mins of audio") 
 
         start = time.time()
         audio = audio.to(dev)
-        chunk_length = 80000
-        chunk_list = []
-        for i in range(0, audio.shape[1], chunk_length):
-            chunk = audio[:, i : i + chunk_length]
+        # chunk_length = 80000
+        # chunk_list = []
+        # for i in range(0, audio.shape[1], chunk_length):
+        #     chunk = audio[:, i : i + chunk_length]
 
-            # Check if chunk is too short
-            if chunk.shape[1] < 10:
-                print(f"Skipping chunk of size {chunk.shape[1]} from speaker {speaker_name}")
-                continue
+        #     # Check if chunk is too short
+        #     if chunk.shape[1] < 10:
+        #         print(f"Skipping chunk of size {chunk.shape[1]} from speaker {speaker_name}")
+        #         continue
 
-            try:
-                with torch.inference_mode():
-                    chunk_features, _ = wavlm.extract_features(chunk, output_layer=6)
-                if chunk_features.dim() == 3:
-                    chunk_features = chunk_features.squeeze(0)  # remove batch dimension only
-                elif chunk_features.dim() == 2:
-                    pass  # already fine
-                else:
-                    print(f"Unexpected shape: {chunk_features.shape}")
-                    continue
-                chunk_list.append(chunk_features)
-            except Exception as e:
-                print(f"Failed to process chunk from speaker {speaker_name}, size={chunk.shape[1]}: {e}")
-                continue
-        target_features = torch.cat(chunk_list, dim=0)
+        #     try:
+        #         with torch.inference_mode():
+        #             chunk_features, _ = wavlm.extract_features(chunk, output_layer=6)
+        #         if chunk_features.dim() == 3:
+        #             chunk_features = chunk_features.squeeze(0)  # remove batch dimension only
+        #         elif chunk_features.dim() == 2:
+        #             pass  # already fine
+        #         else:
+        #             print(f"Unexpected shape: {chunk_features.shape}")
+        #             continue
+        #         chunk_list.append(chunk_features)
+        #     except Exception as e:
+        #         print(f"Failed to process chunk from speaker {speaker_name}, size={chunk.shape[1]}: {e}")
+        #         continue
+        # target_features = torch.cat(chunk_list, dim=0)
+
+        # Extract features from layers 4, 6 and 8 of WavLM
+
         print(target_features.shape)
         print(f"Extracted {target_features.shape[0]} features from speaker {speaker_name}")
         print(f"Extraction took {time.time() - start:.4f} seconds")
