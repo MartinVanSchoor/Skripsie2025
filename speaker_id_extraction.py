@@ -13,7 +13,7 @@ def main(target_length, set):
 ### Desktop
     dev = "cuda"
     librispeech_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/LibriSpeech/{set}-clean")
-    target_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/{set}/{target_length}")
+    target_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/{set}/{target_length}_expanded")
 ### Speaker identity model
     classifier = EncoderClassifier.from_hparams(
         source="speechbrain/spkrec-xvect-voxceleb",

@@ -46,8 +46,8 @@ def main(target_length, subpath):
             if audio.shape[1] >= target_length:
                 audio = audio[:, :target_length]
                 break
-        length = audio.shape[1] / 960000
-        print(f"Accumulated {length} mins of audio") 
+        length = audio.shape[1] / 16000
+        print(f"Accumulated {length} seconds of audio") 
 
         start = time.time()
         audio = audio.to(dev)
@@ -78,6 +78,12 @@ def main(target_length, subpath):
         # target_features = torch.cat(chunk_list, dim=0)
 
         # Extract features from layers 4, 6 and 8 of WavLM
+        target_features = torch.empty(0,1024)
+        target_features = target_features.to(dev)
+        for layer in range(4, 10, 2):
+            feats, _ = wavlm.extract_features(audio, output_layer=layer)
+            feats = feats.squeeze(0)
+            target_features = torch.cat([target_features, feats], dim=0)
 
         print(target_features.shape)
         print(f"Extracted {target_features.shape[0]} features from speaker {speaker_name}")
@@ -86,6 +92,7 @@ def main(target_length, subpath):
         speaker_out_dir.mkdir(parents=True, exist_ok=True)
         torch.save(target_features, out_path)
         print(f"Saved: {out_path}")
+        torch.cuda.empty_cache()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Extract WavLM features for speakers.")

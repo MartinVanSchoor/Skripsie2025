@@ -145,7 +145,7 @@ class kNN_VC(torch.nn.Module):
         return output_features
     
     @torch.inference_mode()
-    def expand_feature_space(self, target_id_dir, target_features, train_dir, train_ids, train_speakers, alpha=0.7):
+    def expand_feature_space(self, target_id_dir, target_features, train_dir, train_ids, train_speakers):
         """ 
         Expands the source speaker's feature space by sampling from
         the most similar speaker in the librispeech train-clean set,
@@ -159,18 +159,18 @@ class kNN_VC(torch.nn.Module):
         print(f"Closest speaker is: {closest_speaker}, loading features...")
         feat_dir = train_dir / closest_speaker / f"{closest_speaker}.pt"
         train_features = torch.load(feat_dir, map_location="cpu") 
-        print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
 
         # Retrieve the necessary amount of features and convert to appropriate device
         diff = 8996 - target_features.shape[0]
         train_features = train_features[:diff].to(self.device) 
-        print(f"Extracting and aligning {diff} features from speaker {closest_speaker}...")
+        print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
 
-        # Align Speaker B to A's style
-        train_feats_aligned = align_features_via_clusters(train_features, target_features, n_clusters=50)
+        # # Align Speaker B to A's style
+        # print(f"Extracting and aligning {diff} features from speaker {closest_speaker}...")
+        # train_feats_aligned = align_features_via_clusters(train_features, target_features, n_clusters=50)
 
         # Concatenate
-        expanded_features = torch.cat([target_features, train_feats_aligned], dim=0)
+        expanded_features = torch.cat([target_features, train_features], dim=0)
 
         return expanded_features
     
@@ -210,7 +210,7 @@ def main(target_length, set):
     perf = "/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/performance/red_csv_vanilla.txt"
     eval_csv = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/eval_trimmed.csv")
     librispeech_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/Librispeech/{set}-clean")
-    targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/{set}/{target_length}")
+    targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/{set}/{target_length}_expanded")
     output_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/converted/{set}/{target_length}")
     train_dir = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train")
     
@@ -276,11 +276,12 @@ def main(target_length, set):
                 print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
 
                 # If the target features are too few, expand the feature space
-                # if (target_length < 180):
-                #     print(f"Insufficient target data, finding closest speaker to speaker {target}...")
-                #     target_features = vc_model.expand_feature_space(target_id_fn, target_features, train_dir, ids, speakers)
-                #     print(f"Expanded target_features to {target_features.shape[0]} features")
-                
+                if (target_length < 180):
+                    print(f"Insufficient target data, finding closest speaker to speaker {target}...")
+                    target_features = vc_model.expand_feature_space(target_id_fn, target_features, train_dir, ids, speakers)
+                    print(f"Expanded target_features to {target_features.shape[0]} features")
+                break
+
                 # Perform kNN matching to get output features
                 print("Performing kNN matching...")
                 output_features = vc_model.knn_matching(source_features, target_features)
@@ -290,7 +291,7 @@ def main(target_length, set):
                 output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
                 torchaudio.save(output_fn, output_wav[None], vc_model.sr_target)
                 print("Succesfully converted")
-                # torch.cuda.empty_cache()  Use this if cuda gives problems with VRAM
+                torch.cuda.empty_cache() 
 
 ### Timing end
     end = time.time()
