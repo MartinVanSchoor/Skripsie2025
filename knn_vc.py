@@ -144,10 +144,11 @@ class kNN_VC(torch.nn.Module):
         return output_features
     
     @torch.inference_mode()
-    def expand_feature_space(self, target_id_dir, target_features, train_dir, train_ids, train_speakers):
+    def expand_feature_space(self, target_id_dir, target_features, train_dir, train_ids, train_speakers, alpha=0.7):
         """ 
         Expands the source speaker's feature space by sampling from
-        the most similar speaker in the librispeech train-clean set
+        the most similar speaker in the librispeech train-clean set,
+        and interpolating in feature space.
         """
         # Load target speaker id
         x = torch.load(target_id_dir)
@@ -156,15 +157,29 @@ class kNN_VC(torch.nn.Module):
         closest_speaker = kNN_VC.find_most_similar_speaker(x, train_ids, train_speakers)
         print(f"Closest speaker is: {closest_speaker}, loading features...")
         feat_dir = train_dir / closest_speaker / f"{closest_speaker}.pt"
-        train_features = torch.load(feat_dir, map_location="cpu")
-        diff = 8996 - target_features.shape[0]
-        train_features_final = train_features[0 : diff, :]
-        train_features_final = train_features_final.to(self.device)
-        print(f"Loaded {train_features_final.shape[0]} features from speaker {closest_speaker}")
-        
-        # Add features to target features to obtain roughly 3 mins worth of features
-        expanded_features = torch.cat([target_features, train_features_final], dim=0)
+        train_features = torch.load(feat_dir).to(self.device)
+        print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
 
+        # Get means
+        A_mean = target_features.mean(dim=0, keepdim=True)  # shape: (1, 1024)
+        diff = 8996 - target_features.shape[0]
+        B_sample = train_features[:diff]  # shape: (diff, 1024)
+        B_sample = B_sample.to(self.device)
+        B_mean = B_sample.mean(dim=0, keepdim=True)
+
+        # Interpolate
+        interpolated_mean = alpha * A_mean + (1 - alpha) * B_mean
+
+        # Add random noise to make the embeddings diverse
+        std = B_sample.std(dim=0, keepdim=True)  # use B's variation
+        noise = torch.randn(diff, 1024).to(self.device) * std
+
+        generated = interpolated_mean + noise  # shape: (diff, 1024)
+
+        # Concatenate
+        expanded_features = torch.cat([target_features, generated], dim=0)
+
+        print(f"Expanded feature shape: {expanded_features.shape}")
         return expanded_features
     
     @torch.inference_mode()
