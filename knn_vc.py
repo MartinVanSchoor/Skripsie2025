@@ -165,12 +165,12 @@ class kNN_VC(torch.nn.Module):
         train_features = train_features[:diff].to(self.device) 
         print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
 
-        # # Align Speaker B to A's style
-        # print(f"Extracting and aligning {diff} features from speaker {closest_speaker}...")
-        # train_feats_aligned = align_features_via_clusters(train_features, target_features, n_clusters=50)
+        # Align Speaker B to A's style
+        print(f"Extracting and aligning {diff} features from speaker {closest_speaker}...")
+        train_feats_aligned = align_features_via_clusters(train_features, target_features, n_clusters=149)
 
         # Concatenate
-        expanded_features = torch.cat([target_features, train_features], dim=0)
+        expanded_features = torch.cat([target_features, train_feats_aligned], dim=0)
 
         return expanded_features
     
@@ -280,7 +280,6 @@ def main(target_length, set):
                     print(f"Insufficient target data, finding closest speaker to speaker {target}...")
                     target_features = vc_model.expand_feature_space(target_id_fn, target_features, train_dir, ids, speakers)
                     print(f"Expanded target_features to {target_features.shape[0]} features")
-                break
 
                 # Perform kNN matching to get output features
                 print("Performing kNN matching...")

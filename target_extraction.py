@@ -80,7 +80,7 @@ def main(target_length, subpath):
         # Extract features from layers 4, 6 and 8 of WavLM
         target_features = torch.empty(0,1024)
         target_features = target_features.to(dev)
-        for layer in range(4, 10, 2):
+        for layer in range(2,9):
             feats, _ = wavlm.extract_features(audio, output_layer=layer)
             feats = feats.squeeze(0)
             target_features = torch.cat([target_features, feats], dim=0)

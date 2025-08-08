@@ -59,4 +59,4 @@ def main(data_dir, epochs=10, batch_size=512, save_path="cvae_model.pt"):
         torch.save(model.state_dict(), save_path)
 
 if __name__ == "__main__":
-    main("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train")  # Path to training data
+    main("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train_reduced")  # Path to training data
