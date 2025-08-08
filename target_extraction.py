@@ -18,8 +18,8 @@ def main(target_length, subpath):
     # target_dir_new = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train_100")
 ### Desktop
     dev = "cuda"
-    target_dir_og = Path("/mnt/c\Users\Martin\Documents\Werk\Universiteit\Skripsie_desktop\librispeech\LibriSpeech\dev-clean")
-    target_dir_new = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/3_expanded")
+    target_dir_og = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/LibriSpeech/dev-clean")
+    target_dir_new = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/dev/3_expanded")
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=dev)
 
 
