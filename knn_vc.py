@@ -157,8 +157,9 @@ class kNN_VC(torch.nn.Module):
         # Find most similar speaker and retrieve features
         closest_speaker = kNN_VC.find_most_similar_speaker(x, train_ids, train_speakers)
         print(f"Closest speaker is: {closest_speaker}, loading features...")
-        feat_dir = train_dir / closest_speaker / f"{closest_speaker}.pt"
-        train_features = torch.load(feat_dir, map_location="cpu") 
+        feat_dir = train_dir / closest_speaker / f"{closest_speaker}.npy"
+        train_features = np.load(feat_dir) 
+        train_features = torch.from_numpy(train_features).to("cpu")
 
         # Retrieve the necessary amount of features and convert to appropriate device
         diff = 8996 - target_features.shape[0]
@@ -167,7 +168,7 @@ class kNN_VC(torch.nn.Module):
 
         # Align Speaker B to A's style
         print(f"Extracting and aligning {diff} features from speaker {closest_speaker}...")
-        train_feats_aligned = align_features_via_clusters(train_features, target_features, n_clusters=150)
+        train_feats_aligned = align_features_via_clusters(train_features, target_features, n_clusters=250)
 
         # Concatenate
         expanded_features = torch.cat([target_features, train_feats_aligned], dim=0)
@@ -210,7 +211,7 @@ def main(target_length, set):
     perf = "/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/performance/red_csv_vanilla.txt"
     eval_csv = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/eval_trimmed.csv")
     librispeech_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/Librispeech/{set}-clean")
-    targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/{set}/{target_length}")
+    targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/{set}/{target_length}_expanded")
     output_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/converted/{set}/{target_length}")
     train_dir = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train")
     

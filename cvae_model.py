@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class CVAE(nn.Module):
-    def __init__(self, input_dim=1024, latent_dim=64, num_speakers=1172):
+    def __init__(self, input_dim=1024, latent_dim=64, num_speakers=51):
         super().__init__()
         self.input_dim = input_dim
         self.latent_dim = latent_dim
