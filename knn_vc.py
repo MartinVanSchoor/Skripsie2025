@@ -167,7 +167,7 @@ class kNN_VC(torch.nn.Module):
 
         # Align Speaker B to A's style
         print(f"Extracting and aligning {diff} features from speaker {closest_speaker}...")
-        train_feats_aligned = align_features_via_clusters(train_features, target_features, n_clusters=149)
+        train_feats_aligned = align_features_via_clusters(train_features, target_features, n_clusters=150)
 
         # Concatenate
         expanded_features = torch.cat([target_features, train_feats_aligned], dim=0)
@@ -210,7 +210,7 @@ def main(target_length, set):
     perf = "/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/performance/red_csv_vanilla.txt"
     eval_csv = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/eval_trimmed.csv")
     librispeech_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/Librispeech/{set}-clean")
-    targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/{set}/{target_length}_expanded")
+    targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/{set}/{target_length}")
     output_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/converted/{set}/{target_length}")
     train_dir = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train")
     

@@ -1,17 +1,22 @@
 from pydub import AudioSegment
 import torch
+from pathlib import Path
+from tqdm import tqdm
 
-# audio1 = AudioSegment.from_wav("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target1_trump180.wav")
-# audio2 = AudioSegment.from_wav("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target2_rfk180.wav")
-# audio3 = AudioSegment.from_wav("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target3_obama180.wav")
+dir_old = Path("C:/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train_reduced")
+dir_new = Path("C:/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train_mini")
+count = 0
 
-# trimmed1 = audio1[0:2_500]
-# trimmed2 = audio2[0:2_500]
-# trimmed3 = audio3[0:2_500]
+for speaker_dir in tqdm(sorted(dir_old.iterdir()), desc="Processing speakers"):
+    if not speaker_dir.is_dir():
+            continue
 
-# trimmed1.export("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target1_trump2_5.wav", format="wav")
-# trimmed2.export("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target2_rfk2_5.wav", format="wav")
-# trimmed3.export("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/target/target3_obama2_5.wav", format="wav")
-
-test = torch.load("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/dev/180/84/84.pt")
-print(test.shape)
+    filename = f"{speaker_dir.name}.pt"
+    path_old = speaker_dir / filename
+    speaker_path_new = dir_new / speaker_dir.name
+    path_new = speaker_path_new / f"{speaker_dir.name}.pt"
+    if (count % 5 == 0):
+        speaker_path_new.mkdir(parents=True, exist_ok=True)
+        tensor = torch.load(path_old, map_location=torch.device('cpu'))
+        torch.save(tensor, path_new)
+    count = count + 1
