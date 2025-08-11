@@ -3,38 +3,39 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from pathlib import Path
 from tqdm import tqdm
+import numpy as np
 
 from cvae_model import CVAE
 
-class WavLMDataset(Dataset):
-    def __init__(self, root_dir):
+class LazySpeakerFeatureDataset(Dataset):
+    def __init__(self, root_dir, features_per_speaker=8996):
         self.root_dir = Path(root_dir)
-        self.speaker_dirs = sorted(self.root_dir.iterdir())
-        self.speaker_to_id = {d.name: i for i, d in enumerate(self.speaker_dirs)}
-
-        # Count number of features per speaker (lightweight)
-        self.lengths = []
-        for speaker_dir in tqdm(self.speaker_dirs, desc="Counting features per speaker"):
-            feats = torch.load(speaker_dir / f"{speaker_dir.name}.pt", map_location='cpu')
-            self.lengths.append(len(feats))
-
-        # Build cumulative sum for global indexing
-        self.cumsum = [0] + list(torch.cumsum(torch.tensor(self.lengths), dim=0).numpy())
+        self.features_per_speaker = features_per_speaker
+        
+        print("Loading speaker directories...")
+        self.speaker_dirs = []
+        for p in tqdm(sorted([p for p in self.root_dir.iterdir() if p.is_dir()]), desc="Speakers"):
+            self.speaker_dirs.append(p)
+        self.speaker_names = [p.name for p in self.speaker_dirs]
+        self.total_samples = len(self.speaker_dirs) * self.features_per_speaker
 
     def __len__(self):
-        return self.cumsum[-1]
+        return self.total_samples
 
     def __getitem__(self, idx):
-        # Find speaker index via cumsum
-        speaker_idx = next(i for i in range(len(self.lengths)) if self.cumsum[i+1] > idx)
-        sample_idx = idx - self.cumsum[speaker_idx]
+        speaker_idx = idx // self.features_per_speaker
+        feature_idx = idx % self.features_per_speaker
 
-        speaker_dir = self.speaker_dirs[speaker_idx]
-        feats = torch.load(speaker_dir / f"{speaker_dir.name}.pt", map_location='cpu')
-
-        vector = feats[sample_idx]
+        speaker_name = self.speaker_names[speaker_idx]
+        feature_path = self.root_dir / speaker_name / f"{speaker_name}.npy"
+        
+        # Load .npy file every time (lazy loading, avoids RAM bloat)
+        features = np.load(feature_path)
+        
+        # Convert single feature vector to torch tensor
+        feature_vec = torch.from_numpy(features[feature_idx]).float()
         speaker_id = speaker_idx
-        return vector, speaker_id
+        return feature_vec, speaker_id
 
 def loss_function(recon_x, x, mu, logvar):
     recon_loss = F.mse_loss(recon_x, x)
@@ -44,7 +45,7 @@ def loss_function(recon_x, x, mu, logvar):
 def train(model, dataloader, optimizer, device):
     model.train()
     total_loss = 0
-    for x, speaker_ids in tqdm(dataloader):
+    for x, speaker_ids in tqdm(dataloader, desc="Training batches"):
         x = x.to(device).float()
         speaker_ids = speaker_ids.to(device)
         optimizer.zero_grad()
@@ -57,17 +58,17 @@ def train(model, dataloader, optimizer, device):
 
 def main(data_dir, epochs=10, batch_size=128, save_path="cvae_model.pt"):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = WavLMDataset(data_dir)
-    dataloader = DataLoader(
-        dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True
-    )
+    print("Loading training data...")
+    dataset = LazySpeakerFeatureDataset(data_dir)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
     
-    model = CVAE(num_speakers=len(dataset.speaker_to_id)).to(device)
+    model = CVAE(num_speakers=len(dataset.speaker_names)).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     for epoch in range(epochs):
+        print(f"Epoch {epoch+1}/{epochs}")
         loss = train(model, dataloader, optimizer, device)
-        print(f"Epoch {epoch+1}, Loss: {loss:.4f}")
+        print(f"Loss: {loss:.4f}")
         torch.save(model.state_dict(), save_path)
 
 if __name__ == "__main__":
