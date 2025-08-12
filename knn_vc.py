@@ -337,10 +337,9 @@ def main(target_length, set):
 
                 # If the target features are too few, expand the feature space
                 if (target_length < 180):
-                    new_embedding = vc_model.optimize_new_speaker_embedding(cvae, target_features, steps=250)
+                    new_embedding = vc_model.optimize_new_speaker_embedding(cvae, target_features, steps=750)
                     target_features = vc_model.generate_augmented_features(cvae, target_features, new_embedding)
                     print(target_features.shape)
-                break
 
                 # Perform kNN matching to get output features
                 print("Performing kNN matching...")
