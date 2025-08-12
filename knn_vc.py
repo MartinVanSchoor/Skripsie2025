@@ -12,6 +12,8 @@ from pathlib import Path
 from tqdm import tqdm
 import torch.nn.functional as F
 from feature_alignment import align_features_via_clusters
+from cvae_model import CVAE
+from torch import optim
 
 n_frames = None
 k_top = 4
@@ -193,6 +195,59 @@ class kNN_VC(torch.nn.Module):
         # Find most similar speaker and return
         _, best_idx = torch.max(similarities, dim=0)
         return speakers[best_idx.item()]
+    
+    def optimize_new_speaker_embedding(self, model, existing_features, steps=500, lr=1e-2):
+        """
+        Optimize a new speaker embedding vector given limited features.
+        """
+        model.eval()
+        N = existing_features.size(0)
+
+        # Initialize new speaker embedding vector (requires grad)
+        embedding_dim = model.spk_embedding.embedding_dim
+        new_embedding = torch.randn(1, embedding_dim, device=self.device, requires_grad=True)
+
+        optimizer = optim.Adam([new_embedding], lr=lr)
+
+        for step in range(steps):
+            optimizer.zero_grad()
+
+            # Expand embedding to batch size
+            spk_embed_batch = new_embedding.expand(N, -1)
+
+            # Encode using the existing features + new embedding
+            mu, logvar = model.encode(existing_features, speaker_embeddings=spk_embed_batch)
+            z = model.reparameterize(mu, logvar)
+            recon = model.decode(z, speaker_embeddings=spk_embed_batch)
+
+            loss = F.mse_loss(recon, existing_features)
+            loss.backward()
+            optimizer.step()
+
+            if step % 50 == 0 or step == steps - 1:
+                print(f"Step {step+1}/{steps} Reconstruction Loss: {loss.item():.6f}")
+
+        return new_embedding.detach()
+
+    @torch.inference_mode()
+    def generate_augmented_features(self, model, existing_features, speaker_embedding, total_target=8996):
+        """
+        Generate additional features conditioned on the optimized speaker embedding.
+        """
+        model.eval()
+        existing_count = existing_features.size(0)
+        to_generate = total_target - existing_count
+        if to_generate <= 0:
+            raise ValueError("Existing features already meet or exceed target")
+
+        with torch.no_grad():
+            z = torch.randn(to_generate, model.latent_dim, device=self.device)
+            spk_embed_batch = speaker_embedding.expand(to_generate, -1)
+            generated_features = model.decode(z, speaker_embeddings=spk_embed_batch).cpu()
+
+        all_features = torch.cat([existing_features.cpu(), generated_features], dim=0)
+        return all_features
+
         
 def main(target_length, set):
     
@@ -211,23 +266,27 @@ def main(target_length, set):
     perf = "/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/performance/red_csv_vanilla.txt"
     eval_csv = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/eval_trimmed.csv")
     librispeech_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/Librispeech/{set}-clean")
-    targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/{set}/{target_length}_expanded")
+    targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/{set}/{target_length}")
     output_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/converted/{set}/{target_length}")
     train_dir = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train")
     
 ### Load in the neccessary models {SSL feature extractor (WavLM) and Vocoder (HiFi-GAN)}
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
     hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
-    if (target_length < 180):
-        ids = torch.empty(0, 512)
-        speakers = np.array([], dtype=str)
-        for speaker_dir in tqdm(sorted(train_dir.iterdir()), desc="Loading training id's"):
-            speaker_name = speaker_dir.name
-            speaker_id_fn = speaker_dir / f"{speaker_name}_id.pt"
-            id = torch.load(speaker_id_fn)
-            id = id.unsqueeze(0)
-            speakers = np.append(speakers, speaker_name)
-            ids = torch.cat([ids, id], dim=0)
+    cvae = CVAE(num_speakers=10).to(device)
+    checkpoint = torch.load("checkpoints/cvae_checkpoint_epoch_5_batch_end.pt", map_location=device)
+    cvae.load_state_dict(checkpoint["model_state"])
+    cvae.eval()
+    # if (target_length < 180):
+    #     ids = torch.empty(0, 512)
+    #     speakers = np.array([], dtype=str)
+    #     for speaker_dir in tqdm(sorted(train_dir.iterdir()), desc="Loading training id's"):
+    #         speaker_name = speaker_dir.name
+    #         speaker_id_fn = speaker_dir / f"{speaker_name}_id.pt"
+    #         id = torch.load(speaker_id_fn)
+    #         id = id.unsqueeze(0)
+    #         speakers = np.append(speakers, speaker_name)
+    #         ids = torch.cat([ids, id], dim=0)
     
 ### Timing start and model initialization
     start = time.time()
@@ -278,9 +337,7 @@ def main(target_length, set):
 
                 # If the target features are too few, expand the feature space
                 if (target_length < 180):
-                    print(f"Insufficient target data, finding closest speaker to speaker {target}...")
-                    target_features = vc_model.expand_feature_space(target_id_fn, target_features, train_dir, ids, speakers)
-                    print(f"Expanded target_features to {target_features.shape[0]} features")
+                    print("yeet")
 
                 # Perform kNN matching to get output features
                 print("Performing kNN matching...")
@@ -298,18 +355,18 @@ def main(target_length, set):
     print(f"Finished all conversions in time: {(end - start)/60:.2f} minutes")
     
 ### Performance evaluation
-    print("Evaluating similarity")
-    eer_mean, eer_std = evaluate_similarity(librispeech_dir, output_dir, eval_csv)
-    print("Evaluating intelligibility")
-    wer_mean, wer_std, cer_mean, cer_std = evaluate_intelligibility(librispeech_dir, output_dir)
-    with open(perf, "a") as f:
-        f.write(f"The performance of the kNN_VC model for {target_length} seconds of target audio from the {set}-clean set is:\n")
-        f.write("Intelligiblity:\n")
-        f.write(f"WER: {wer_mean} +- {wer_std}\n")
-        f.write(f"CER: {cer_mean} +- {cer_std}\n")
-        f.write("Similarity:\n")
-        f.write(f"EER: {eer_mean} +- {eer_std}\n")
-        f.write("\n")
+    # print("Evaluating similarity")
+    # eer_mean, eer_std = evaluate_similarity(librispeech_dir, output_dir, eval_csv)
+    # print("Evaluating intelligibility")
+    # wer_mean, wer_std, cer_mean, cer_std = evaluate_intelligibility(librispeech_dir, output_dir)
+    # with open(perf, "a") as f:
+    #     f.write(f"The performance of the kNN_VC model for {target_length} seconds of target audio from the {set}-clean set is:\n")
+    #     f.write("Intelligiblity:\n")
+    #     f.write(f"WER: {wer_mean} +- {wer_std}\n")
+    #     f.write(f"CER: {cer_mean} +- {cer_std}\n")
+    #     f.write("Similarity:\n")
+    #     f.write(f"EER: {eer_mean} +- {eer_std}\n")
+    #     f.write("\n")
 
 if __name__ == "__main__":
     import argparse
