@@ -1,7 +1,6 @@
-# train_cvae.py (fault-tolerant, resumable)
+# train_cvae.py (fault-tolerant, resumable, robust checkpointing)
 import os
 import glob
-import time
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
@@ -36,10 +35,9 @@ class LazySpeakerFeatureDataset(Dataset):
         speaker_name = self.speaker_names[speaker_idx]
         feature_path = self.root_dir / speaker_name / f"{speaker_name}.npy"
 
-        # Load .npy file every time (lazy loading)
+        # Lazy load
         features = np.load(feature_path, mmap_mode=None)
         feature_vec = torch.from_numpy(features[feature_idx]).float()
-        # free numpy array reference asap (help GC)
         del features
         return feature_vec, speaker_idx
 
@@ -65,25 +63,31 @@ def find_latest_checkpoint(checkpoint_dir, pattern="cvae_checkpoint_epoch_*.pt")
     return files[-1]
 
 # ---------------------------
-# Training loop (resumable)
+# Training loop
 # ---------------------------
-def train_epoch(model, dataloader, optimizer, device, start_batch=0,
-                checkpoint_dir="checkpoints", checkpoint_every=200,
-                empty_cache_every=50):
+def train_epoch(model, dataloader, optimizer, device, current_epoch_idx, total_epochs,
+                start_batch=0, checkpoint_dir="checkpoints",
+                checkpoint_every=100, empty_cache_every=50):
+    """
+    current_epoch_idx: zero-based epoch index
+    start_batch: zero-based index of batch to start from (0 means start of epoch)
+    """
     model.train()
     total_loss = 0.0
-    batch_idx = 0
-    pbar = tqdm(enumerate(dataloader), total=len(dataloader), desc="Training batches", initial=start_batch)
+    batch_idx = -1
+
+    human_epoch = current_epoch_idx + 1
+    pbar = tqdm(enumerate(dataloader), total=len(dataloader),
+                desc=f"Epoch {human_epoch}/{total_epochs} - Training",
+                initial=start_batch)
+
     for i, (x, speaker_ids) in pbar:
-        # skip already-processed batches if resuming within epoch
         if i < start_batch:
             continue
 
-        # move to device
         x = x.to(device, non_blocking=True).float()
         speaker_ids = speaker_ids.to(device, non_blocking=True)
 
-        # quick NaN/Inf check
         if not torch.isfinite(x).all():
             print(f"Non-finite values detected in batch {i}; skipping batch.")
             continue
@@ -96,53 +100,51 @@ def train_epoch(model, dataloader, optimizer, device, start_batch=0,
 
         total_loss += loss.item()
         batch_idx = i
-
-        # Update progress bar
         pbar.set_postfix(loss=loss.item())
 
-        # periodic cache clear to reduce fragmentation
         if (i + 1) % empty_cache_every == 0:
             torch.cuda.empty_cache()
 
-        # periodic checkpoint
+        # periodic checkpoint: save resume_epoch_idx = current_epoch_idx, resume_batch = i+1
         if (i + 1) % checkpoint_every == 0:
-            ckpt_name = f"cvae_checkpoint_epoch_{train_epoch.current_epoch}_batch_{i+1}.pt"
+            ckpt_name = f"cvae_checkpoint_epoch_{human_epoch}_batch_{i+1}.pt"
             state = {
-                "epoch": train_epoch.current_epoch,
-                "batch": i + 1,
+                "epoch": human_epoch,               # human readable (1-based)
+                "epoch_idx": current_epoch_idx,    # zero-based epoch index for this epoch
+                "batch": i + 1,                    # next batch index to resume at
                 "model_state": model.state_dict(),
                 "optimizer_state": optimizer.state_dict(),
             }
             save_checkpoint(state, checkpoint_dir, ckpt_name)
 
+    # if no batches processed (batch_idx == -1) we return 0
+    if batch_idx < 0:
+        return 0.0
     return total_loss / max(1, (batch_idx + 1))
 
-# attach attribute for epoch tracking (mutable)
-train_epoch.current_epoch = 0
-
 # ---------------------------
-# Main entry (resume support)
+# Main
 # ---------------------------
 def main(data_dir,
-         epochs=1,
+         epochs=5,
          batch_size=128,
          checkpoint_dir="checkpoints",
-         checkpoint_every=200,
+         checkpoint_every=100,
          empty_cache_every=50,
          num_workers=1,
          resume=True):
 
-    # Optional: when debugging long CUDA issues, set this env var in shell:
-    # CUDA_LAUNCH_BLOCKING=1 python train_cvae.py
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
 
     dataset = LazySpeakerFeatureDataset(data_dir)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True,
+                             num_workers=num_workers, pin_memory=True)
 
     model = CVAE(num_speakers=len(dataset.speaker_names)).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
+    # start_epoch is zero-based index
     start_epoch = 0
     start_batch = 0
 
@@ -152,44 +154,71 @@ def main(data_dir,
         if latest:
             print("Resuming from checkpoint:", latest)
             ckpt = torch.load(latest, map_location=device)
-            model.load_state_dict(ckpt["model_state"])
-            optimizer.load_state_dict(ckpt["optimizer_state"])
-            start_epoch = ckpt.get("epoch", 0)
-            start_batch = ckpt.get("batch", 0)
-            print(f"Resumed at epoch {start_epoch}, batch {start_batch}")
+            # load weights/state
+            model.load_state_dict(ckpt.get("model_state", model.state_dict()))
+            optimizer.load_state_dict(ckpt.get("optimizer_state", optimizer.state_dict()))
+
+            # Backwards-compatible resume parsing:
+            # Prefer explicit zero-based 'epoch_idx' if present. Otherwise use heuristic from ('epoch','batch').
+            if "epoch_idx" in ckpt:
+                start_epoch = int(ckpt.get("epoch_idx", 0))
+                start_batch = int(ckpt.get("batch", 0)) if ckpt.get("batch", None) is not None else 0
+            else:
+                # legacy: ckpt['epoch'] is human-readable (1-based), ckpt['batch'] is next batch
+                ckpt_epoch = int(ckpt.get("epoch", 0))
+                ckpt_batch = int(ckpt.get("batch", 0)) if ckpt.get("batch", None) is not None else 0
+                if ckpt_batch == 0:
+                    # completed ckpt_epoch, start at next epoch index (zero-based)
+                    start_epoch = ckpt_epoch
+                    start_batch = 0
+                else:
+                    # mid-epoch checkpoint where ckpt_epoch is human (1-based)
+                    start_epoch = max(ckpt_epoch - 1, 0)
+                    start_batch = ckpt_batch
+
+            # safety clamp
+            if start_epoch >= epochs:
+                print(f"Checkpoint indicates start_epoch {start_epoch} >= configured epochs {epochs}. Setting start_epoch={epochs-1}, start_batch=0")
+                start_epoch = max(0, epochs - 1)
+                start_batch = 0
+
+            print(f"Resuming at (human) epoch {start_epoch+1}, batch {start_batch}")
 
     # Training loop
     try:
-        for epoch in range(start_epoch, epochs):
-            train_epoch.current_epoch = epoch + 1
-            print(f"Epoch {epoch+1}/{epochs}")
+        for epoch_idx in range(start_epoch, epochs):
+            human_epoch = epoch_idx + 1
+            print(f"Epoch {human_epoch}/{epochs}")
             avg_loss = train_epoch(model, dataloader, optimizer, device,
-                                   start_batch=start_batch,
+                                   current_epoch_idx=epoch_idx, total_epochs=epochs,
+                                   start_batch=start_batch if epoch_idx == start_epoch else 0,
                                    checkpoint_dir=checkpoint_dir,
                                    checkpoint_every=checkpoint_every,
                                    empty_cache_every=empty_cache_every)
-            print(f"Epoch {epoch+1} average loss: {avg_loss:.6f}")
+            print(f"Epoch {human_epoch} average loss: {avg_loss:.6f}")
 
-            # Save epoch checkpoint
-            ckpt_name = f"cvae_checkpoint_epoch_{epoch+1}_batch_end.pt"
+            # Save epoch-complete checkpoint: indicate next epoch index = epoch_idx + 1 and batch = 0
+            ckpt_name = f"cvae_checkpoint_epoch_{human_epoch}_batch_end.pt"
             state = {
-                "epoch": epoch + 1,
+                "epoch": human_epoch,
+                "epoch_idx": epoch_idx + 1,  # next epoch index (zero-based)
                 "batch": 0,
                 "model_state": model.state_dict(),
                 "optimizer_state": optimizer.state_dict(),
             }
             save_checkpoint(state, checkpoint_dir, ckpt_name)
 
-            # reset start_batch after first resumed epoch
+            # reset start_batch after we've resumed the first epoch
             start_batch = 0
 
     except Exception as e:
-        # Save a safe checkpoint on exception
         print("Exception during training:", repr(e))
-        safe_name = f"cvae_safecrash_epoch_{train_epoch.current_epoch}_batch_{start_batch}.pt"
+        # Try to save a safe checkpoint using the best-known indices
         try:
+            safe_name = f"cvae_safecrash_epoch_{start_epoch}_batch_{start_batch}.pt"
             state = {
-                "epoch": train_epoch.current_epoch,
+                "epoch": start_epoch + 1,
+                "epoch_idx": start_epoch,
                 "batch": start_batch,
                 "model_state": model.state_dict(),
                 "optimizer_state": optimizer.state_dict(),
@@ -198,17 +227,16 @@ def main(data_dir,
             print("Saved safe checkpoint before exiting.")
         except Exception as ex2:
             print("Failed to save checkpoint on crash:", repr(ex2))
-        raise  # re-raise so you see the original error
+        raise
 
 if __name__ == "__main__":
-    # Tune these params as needed
     main(
         data_dir="/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train_mini",
-        epochs=1,
+        epochs=5,
         batch_size=128,
         checkpoint_dir="checkpoints",
-        checkpoint_every=200,     # save every 2500 batches
-        empty_cache_every=50,     # call empty_cache every 500 batches
+        checkpoint_every=100,
+        empty_cache_every=50,
         num_workers=1,
         resume=True
     )
