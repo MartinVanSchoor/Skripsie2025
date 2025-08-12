@@ -28,8 +28,19 @@ class CVAE(nn.Module):
             nn.Linear(512, input_dim)
         )
 
-    def encode(self, x, speaker_ids):
-        spk_embed = self.spk_embedding(speaker_ids)
+    def encode(self, x, speaker_ids=None, speaker_embeddings=None):
+        """
+        Args:
+            x: [batch, input_dim]
+            speaker_ids: LongTensor [batch] or None
+            speaker_embeddings: Tensor [batch, 64] or None
+        One of speaker_ids or speaker_embeddings must be provided.
+        """
+        if speaker_embeddings is None:
+            assert speaker_ids is not None, "Must provide speaker_ids or speaker_embeddings"
+            spk_embed = self.spk_embedding(speaker_ids)
+        else:
+            spk_embed = speaker_embeddings
         x = torch.cat([x, spk_embed], dim=1)
         h = self.encoder(x)
         return self.mu(h), self.logvar(h)
@@ -39,13 +50,24 @@ class CVAE(nn.Module):
         eps = torch.randn_like(std)
         return mu + eps * std
 
-    def decode(self, z, speaker_ids):
-        spk_embed = self.spk_embedding(speaker_ids)
+    def decode(self, z, speaker_ids=None, speaker_embeddings=None):
+        """
+        Args:
+            z: [batch, latent_dim]
+            speaker_ids: LongTensor [batch] or None
+            speaker_embeddings: Tensor [batch, 64] or None
+        One of speaker_ids or speaker_embeddings must be provided.
+        """
+        if speaker_embeddings is None:
+            assert speaker_ids is not None, "Must provide speaker_ids or speaker_embeddings"
+            spk_embed = self.spk_embedding(speaker_ids)
+        else:
+            spk_embed = speaker_embeddings
         z = torch.cat([z, spk_embed], dim=1)
         return self.decoder(z)
 
     def forward(self, x, speaker_ids):
-        mu, logvar = self.encode(x, speaker_ids)
+        mu, logvar = self.encode(x, speaker_ids=speaker_ids)
         z = self.reparameterize(mu, logvar)
-        x_recon = self.decode(z, speaker_ids)
+        x_recon = self.decode(z, speaker_ids=speaker_ids)
         return x_recon, mu, logvar
