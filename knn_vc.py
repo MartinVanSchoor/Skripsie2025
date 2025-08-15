@@ -263,20 +263,20 @@ def main(target_length, set):
     # train_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train")
  ## For Desktop
     device = "cuda"
-    perf = "/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/performance/red_csv_vanilla.txt"
-    eval_csv = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/eval_trimmed.csv")
-    librispeech_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/Librispeech/{set}-clean")
-    targets_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/{set}/{target_length}")
-    output_dir = Path(f"/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/converted/{set}/{target_length}")
-    train_dir = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train")
+    perf = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/performance/red_csv_vanilla.txt"
+    eval_csv = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/eval_trimmed.csv")
+    librispeech_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/librispeech/LibriSpeech/dev-clean")
+    targets_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/librispeech_targets/dev/{target_length}")
+    output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/dev/{target_length}")
+    train_dir = Path("/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/train_reduced")
     
 ### Load in the neccessary models {SSL feature extractor (WavLM) and Vocoder (HiFi-GAN)}
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
     hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
-    cvae = CVAE(num_speakers=10).to(device)
-    checkpoint = torch.load("checkpoints/cvae_checkpoint_epoch_5_batch_end.pt", map_location=device)
-    cvae.load_state_dict(checkpoint["model_state"])
-    cvae.eval()
+    # cvae = CVAE(num_speakers=10).to(device)
+    # checkpoint = torch.load("checkpoints/cvae_checkpoint_epoch_5_batch_end.pt", map_location=device)
+    # cvae.load_state_dict(checkpoint["model_state"])
+    # cvae.eval()
     # if (target_length < 180):
     #     ids = torch.empty(0, 512)
     #     speakers = np.array([], dtype=str)
@@ -357,18 +357,18 @@ def main(target_length, set):
     print(f"Finished all conversions in time: {(end - start)/60:.2f} minutes")
     
 ### Performance evaluation
-    # print("Evaluating similarity")
-    # eer_mean, eer_std = evaluate_similarity(librispeech_dir, output_dir, eval_csv)
-    # print("Evaluating intelligibility")
-    # wer_mean, wer_std, cer_mean, cer_std = evaluate_intelligibility(librispeech_dir, output_dir)
-    # with open(perf, "a") as f:
-    #     f.write(f"The performance of the kNN_VC model for {target_length} seconds of target audio from the {set}-clean set is:\n")
-    #     f.write("Intelligiblity:\n")
-    #     f.write(f"WER: {wer_mean} +- {wer_std}\n")
-    #     f.write(f"CER: {cer_mean} +- {cer_std}\n")
-    #     f.write("Similarity:\n")
-    #     f.write(f"EER: {eer_mean} +- {eer_std}\n")
-    #     f.write("\n")
+    print("Evaluating similarity")
+    eer_mean, eer_std = evaluate_similarity(librispeech_dir, output_dir, eval_csv)
+    print("Evaluating intelligibility")
+    wer_mean, wer_std, cer_mean, cer_std = evaluate_intelligibility(librispeech_dir, output_dir)
+    with open(perf, "a") as f:
+        f.write(f"The performance of the kNN_VC model for {target_length} seconds of target audio from the {set}-clean set is:\n")
+        f.write("Intelligiblity:\n")
+        f.write(f"WER: {wer_mean} +- {wer_std}\n")
+        f.write(f"CER: {cer_mean} +- {cer_std}\n")
+        f.write("Similarity:\n")
+        f.write(f"EER: {eer_mean} +- {eer_std}\n")
+        f.write("\n")
 
 if __name__ == "__main__":
     import argparse
