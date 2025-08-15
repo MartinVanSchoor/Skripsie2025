@@ -4,34 +4,30 @@ from pathlib import Path
 from tqdm import tqdm
 import numpy as np
 
-dir_old = Path("C:/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train")
-dir_new = Path("C:/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/train_mini")
+dir_old = Path("/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/train_reduced")
+dir_new = Path("/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/train_mini")
 count = 0
 
 for speaker_dir in tqdm(sorted(dir_old.iterdir()), desc="Processing speakers"):
     if not speaker_dir.is_dir():
         continue
 
-    filename = f"{speaker_dir.name}.pt"
-    path_old = speaker_dir / filename
+    feat_fn = f"{speaker_dir.name}.npy"
+    feat_path_old = speaker_dir / feat_fn
+    id_fn = f"{speaker_dir.name}_id.npy"
+    id_path_old = speaker_dir / id_fn
 
-    # Load the tensor
-    features = torch.load(path_old, map_location=torch.device('cpu'))
+    # Load the tensor & convert to numpy
+    features = np.load(feat_path_old)
+    ids = np.load(id_path_old)
 
-    # Convert to numpy array
-    features_np = features.numpy()
-
-    # Save as .npy file
-    path_new = speaker_dir / f"{speaker_dir.name}.npy"
-    np.save(path_new, features_np)
-
-    # Delete the original .pt file
-    path_old.unlink()
+    speaker_dir_new = dir_new / speaker_dir.name
+    feat_path_new = speaker_dir_new / f"{speaker_dir.name}.npy"
+    id_path_new = speaker_dir_new / f"{speaker_dir.name}_id.npy"
     
-    # speaker_path_new = dir_new / speaker_dir.name
-    # path_new = speaker_path_new / f"{speaker_dir.name}.pt"
-    # if (count % 5 == 0):
-    #     speaker_path_new.mkdir(parents=True, exist_ok=True)
-    #     tensor = torch.load(path_old, map_location=torch.device('cpu'))
-    #     torch.save(tensor, path_new)
-    # count = count + 1
+    count = count + 1
+    if (count % 5 == 0):
+        speaker_dir_new.mkdir(parents=True, exist_ok=True)
+        np.save(feat_path_new, features)
+        np.save(id_path_new, ids)
+        
