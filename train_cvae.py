@@ -34,7 +34,7 @@ from cvae_model import CVAE
 # -------------------------
 # Global config (edit here)
 # -------------------------
-DATA_DIR = "train_dir"           # <-- change this to your data folder
+DATA_DIR = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/train_mini"           # <-- change this to your data folder
 CHECKPOINT_DIR = "checkpoints"
 STATS_PATH = os.path.join(CHECKPOINT_DIR, "train_stats.npz")
 

@@ -29,7 +29,7 @@ from cvae_model import CVAE
 CHECKPOINT_PATH = "checkpoints/cvae_epoch200.pt"  # checkpoint to load
 SPEAKER_ID_PATH = "some_speaker/some_speaker_id.npy"  # required
 SEED_FRAMES_PATH = None  # optional: path to .npy of shape (N_seed, x_dim). If None -> prior sampling
-N_SAMPLES = 1000
+N_SAMPLES = 8847
 OUTPUT_PATH = "generated_samples.npy"  # saves (N_SAMPLES, x_dim)
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 # ---------------------------
