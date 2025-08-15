@@ -12,8 +12,8 @@ from pathlib import Path
 from tqdm import tqdm
 import torch.nn.functional as F
 from feature_alignment import align_features_via_clusters
-from cvae_model import CVAE
 from torch import optim
+import sample_from_cvae as cvae
 
 n_frames = None
 k_top = 4
@@ -22,23 +22,6 @@ def largest_divisor_in_range(n, low=1, high=800_000):
     for d in range(high, low - 1, -1):
         if n % d == 0:
             return d
-        
-def fast_cosine_sim(x: torch.Tensor, y: torch.Tensor):
-    """
-    x: [D]           — query vector
-    y: [N, D]        — dataset of vectors to compare against
-    Returns:
-        max_sim:     — maximum cosine similarity
-        best_idx:    — index of most similar vector in y
-    """
-    x_norm = F.normalize(x, dim=0)          # [D]
-    y_norm = F.normalize(y, dim=1)          # [N, D]
-    
-    # Compute cosine similarities
-    similarities = torch.matmul(y_norm, x_norm)  # [N]
-    
-    max_sim, best_idx = torch.max(similarities, dim=0)
-    return max_sim.item(), best_idx.item()
         
 def evaluate_intelligibility(groundtruth, converted):
     args = SimpleNamespace(
@@ -195,58 +178,6 @@ class kNN_VC(torch.nn.Module):
         # Find most similar speaker and return
         _, best_idx = torch.max(similarities, dim=0)
         return speakers[best_idx.item()]
-    
-    def optimize_new_speaker_embedding(self, model, existing_features, steps=500, lr=1e-2):
-        """
-        Optimize a new speaker embedding vector given limited features.
-        """
-        model.eval()
-        N = existing_features.size(0)
-
-        # Initialize new speaker embedding vector (requires grad)
-        embedding_dim = model.spk_embedding.embedding_dim
-        new_embedding = torch.randn(1, embedding_dim, device=self.device, requires_grad=True)
-
-        optimizer = optim.Adam([new_embedding], lr=lr)
-
-        for step in range(steps):
-            optimizer.zero_grad()
-
-            # Expand embedding to batch size
-            spk_embed_batch = new_embedding.expand(N, -1)
-
-            # Encode using the existing features + new embedding
-            mu, logvar = model.encode(existing_features, speaker_embeddings=spk_embed_batch)
-            z = model.reparameterize(mu, logvar)
-            recon = model.decode(z, speaker_embeddings=spk_embed_batch)
-
-            loss = F.mse_loss(recon, existing_features)
-            loss.backward()
-            optimizer.step()
-
-            if step % 50 == 0 or step == steps - 1:
-                print(f"Step {step+1}/{steps} Reconstruction Loss: {loss.item():.6f}")
-
-        return new_embedding.detach()
-
-    @torch.inference_mode()
-    def generate_augmented_features(self, model, existing_features, speaker_embedding, total_target=8996):
-        """
-        Generate additional features conditioned on the optimized speaker embedding.
-        """
-        model.eval()
-        existing_count = existing_features.size(0)
-        to_generate = total_target - existing_count
-        if to_generate <= 0:
-            raise ValueError("Existing features already meet or exceed target")
-
-        with torch.no_grad():
-            z = torch.randn(to_generate, model.latent_dim, device=self.device)
-            spk_embed_batch = speaker_embedding.expand(to_generate, -1)
-            generated_features = model.decode(z, speaker_embeddings=spk_embed_batch).cpu()
-
-        all_features = torch.cat([existing_features.cpu(), generated_features], dim=0)
-        return all_features
 
         
 def main(target_length, set):
@@ -273,10 +204,7 @@ def main(target_length, set):
 ### Load in the neccessary models {SSL feature extractor (WavLM) and Vocoder (HiFi-GAN)}
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
     hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
-    # cvae = CVAE(num_speakers=10).to(device)
-    # checkpoint = torch.load("checkpoints/cvae_checkpoint_epoch_5_batch_end.pt", map_location=device)
-    # cvae.load_state_dict(checkpoint["model_state"])
-    # cvae.eval()
+    # Load speaker id's for sampling
     # if (target_length < 180):
     #     ids = torch.empty(0, 512)
     #     speakers = np.array([], dtype=str)
@@ -336,10 +264,7 @@ def main(target_length, set):
                 print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
 
                 # If the target features are too few, expand the feature space
-                if (target_length < 180):
-                    new_embedding = vc_model.optimize_new_speaker_embedding(cvae, target_features, steps=750)
-                    target_features = vc_model.generate_augmented_features(cvae, target_features, new_embedding)
-                    print(target_features.shape)
+                # if (target_length < 180):
 
                 # Perform kNN matching to get output features
                 print("Performing kNN matching...")

@@ -27,10 +27,7 @@ from cvae_model import CVAE
 # Edit these when running CLI
 # ---------------------------
 CHECKPOINT_PATH = "checkpoints/cvae_epoch200.pt"  # checkpoint to load
-SPEAKER_ID_PATH = "some_speaker/some_speaker_id.npy"  # required
-SEED_FRAMES_PATH = None  # optional: path to .npy of shape (N_seed, x_dim). If None -> prior sampling
-N_SAMPLES = 8847
-OUTPUT_PATH = "generated_samples.npy"  # saves (N_SAMPLES, x_dim)
+# OUTPUT_PATH = "generated_samples.npy"  # saves (N_SAMPLES, x_dim)
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 # ---------------------------
 
@@ -108,25 +105,46 @@ def sample_from_seed_posterior(model, seed_frames, c_vec, n_samples=100, mean=No
     return x
 
 
-def main():
+def main(SPEAKER_ID: torch.Tensor, SEED_FRAMES: torch.Tensor, N_SAMPLES: int):
+    """
+    SPEAKER_ID: torch.Tensor of shape [512], dtype=torch.float32
+    SEED_FRAMES: torch.Tensor of shape [n_frames, 1024] or None
+    N_SAMPLES: number of frames to generate
+    """
     assert os.path.exists(CHECKPOINT_PATH), f"Checkpoint not found: {CHECKPOINT_PATH}"
-    assert os.path.exists(SPEAKER_ID_PATH), f"Speaker id file not found: {SPEAKER_ID_PATH}"
+    assert SPEAKER_ID.shape == (512,), f"Expected speaker ID shape (512,), got {SPEAKER_ID.shape}"
+    assert SPEAKER_ID.dtype == torch.float32, f"SPEAKER_ID must be float32, got {SPEAKER_ID.dtype}"
 
     model, mean, std = load_checkpoint(CHECKPOINT_PATH, device=DEVICE)
-    c_vec = np.load(SPEAKER_ID_PATH).astype(np.float32)
 
-    if SEED_FRAMES_PATH is None:
+    # Move to device
+    c_vec = SPEAKER_ID.to(DEVICE)
+
+    if SEED_FRAMES is None:
         print(f"Sampling {N_SAMPLES} frames from prior conditioned on speaker id")
-        samples = sample_prior(model, c_vec, n_samples=N_SAMPLES, mean=mean, std=std, device=DEVICE)
+        samples_np = sample_prior(model, c_vec.cpu().numpy(), n_samples=N_SAMPLES,
+                                  mean=mean, std=std, device=DEVICE)
     else:
-        assert os.path.exists(SEED_FRAMES_PATH), f"Seed frames file not found: {SEED_FRAMES_PATH}"
-        seed_frames = np.load(SEED_FRAMES_PATH).astype(np.float32)
-        print(f"Using {seed_frames.shape[0]} seed frames to estimate posterior and sampling {N_SAMPLES} frames.")
-        samples = sample_from_seed_posterior(model, seed_frames, c_vec, n_samples=N_SAMPLES, mean=mean, std=std, device=DEVICE)
+        assert SEED_FRAMES.ndim == 2 and SEED_FRAMES.shape[1] == 1024, \
+            f"SEED_FRAMES must have shape [n_frames, 1024], got {SEED_FRAMES.shape}"
+        assert SEED_FRAMES.dtype == torch.float32, f"SEED_FRAMES must be float32, got {SEED_FRAMES.dtype}"
 
-    # Save generated features
-    np.save(OUTPUT_PATH, samples)
-    print(f"Saved generated samples to {OUTPUT_PATH} (shape: {samples.shape})")
+        seed_frames = SEED_FRAMES.to(DEVICE)
+        print(f"Using {seed_frames.shape[0]} seed frames to estimate posterior and sampling {N_SAMPLES} frames.")
+        samples_np = sample_from_seed_posterior(
+            model,
+            seed_frames.cpu().numpy(),
+            c_vec.cpu().numpy(),
+            n_samples=N_SAMPLES,
+            mean=mean,
+            std=std,
+            device=DEVICE
+        )
+
+    # Convert to torch tensor before returning
+    samples_tensor = torch.from_numpy(samples_np).float().to(DEVICE)
+    return samples_tensor
+
 
 
 if __name__ == "__main__":

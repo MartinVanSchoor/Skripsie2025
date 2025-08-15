@@ -27,6 +27,7 @@ from typing import List, Tuple
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
+import torch.nn.functional as F
 from torch import nn, optim
 
 from cvae_model import CVAE
