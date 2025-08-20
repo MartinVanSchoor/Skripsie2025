@@ -33,7 +33,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def load_checkpoint(ckpt_path: str, device="cpu"):
-    ckpt = torch.load(ckpt_path, map_location=device)
+    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     cfg = ckpt.get("config", {})
     x_dim = cfg.get("x_dim", 1024)
     c_dim = cfg.get("c_dim", 512)
