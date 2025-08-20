@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from pathlib import Path
 from tqdm import tqdm
 import torch.nn.functional as F
-from feature_alignment import align_features_via_local_affine
+from feature_alignment import align_features_via_clusters
 from torch import optim
 import sample_from_cvae as cvae
 
@@ -147,7 +147,7 @@ class kNN_VC(torch.nn.Module):
 
         # Align Speaker B to A's style
         print(f"Extracting and aligning {diff} features from speaker {closest_speaker}...")
-        train_feats_aligned = align_features_via_local_affine(train_features, target_features)
+        train_feats_aligned = align_features_via_clusters(train_features, target_features)
 
         # Concatenate
         expanded_features = torch.cat([target_features, train_feats_aligned], dim=0)
