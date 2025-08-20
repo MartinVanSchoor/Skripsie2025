@@ -1,41 +1,40 @@
 import torch
 import torch.nn.functional as F
-from sklearn.cluster import KMeans
 
-def get_cluster_centroids(features: torch.Tensor, n_clusters: int):
+def find_k_nearest_neighbors(src_feats, tgt_feats, k=5):
     """
-    Cluster embeddings and return centroids as torch tensor.
-    features: (N, D) CPU tensor or numpy array.
-    Returns: (n_clusters, D) tensor
+    For each source feature, find k nearest target features
+    using cosine similarity.
+    
+    Args:
+        src_feats: (N_src, D) tensor
+        tgt_feats: (N_tgt, D) tensor
+        k: number of neighbors
+    
+    Returns:
+        matched_tgts: (N_src, k, D) tensor of target features
     """
-    # KMeans expects numpy input on CPU
-    X = features.cpu().numpy()
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42).fit(X)
-    centroids = torch.tensor(kmeans.cluster_centers_, dtype=features.dtype, device=features.device)
-    return centroids
+    src_norm = F.normalize(src_feats, dim=1)   # (N_src, D)
+    tgt_norm = F.normalize(tgt_feats, dim=1)   # (N_tgt, D)
 
-def match_clusters(centroids_B: torch.Tensor, centroids_A: torch.Tensor):
-    """
-    Match B's centroids to closest A centroids by cosine similarity.
-    Returns indices of A matched to each B centroid.
-    """
-    B_norm = F.normalize(centroids_B, dim=1)
-    A_norm = F.normalize(centroids_A, dim=1)
+    sims = torch.matmul(src_norm, tgt_norm.T)  # (N_src, N_tgt)
+    indices = torch.topk(sims, k=k, dim=1).indices  # (N_src, k)
 
-    sims = torch.matmul(B_norm, A_norm.T)  # (n_clusters_B, n_clusters_A)
-    indices = torch.argmax(sims, dim=1)    # Best match in A for each B centroid
-    return indices
+    matched_tgts = tgt_feats[indices]  # (N_src, k, D)
+    return matched_tgts
 
-def learn_affine_mapping(X_src, X_tgt):
+
+def learn_local_affine(X_src, X_tgt):
     """
-    Learn global affine mapping from X_src -> X_tgt with least squares.
-    X_src: (N, D), X_tgt: (N, D)
+    Learn affine mapping for one local neighborhood.
+    X_src: (k, D), X_tgt: (k, D)
     Returns: W (D+1, D)
     """
-    X_src_aug = torch.cat([X_src, torch.ones(X_src.size(0), 1, device=X_src.device)], dim=1)
+    X_src_aug = torch.cat([X_src, torch.ones(X_src.size(0), 1, device=X_src.device)], dim=1)  # (k, D+1)
     result = torch.linalg.lstsq(X_src_aug, X_tgt)
-    W = result.solution
+    W = result.solution  # (D+1, D)
     return W
+
 
 def apply_affine_mapping(X, W):
     """
@@ -47,31 +46,33 @@ def apply_affine_mapping(X, W):
     X_aug = torch.cat([X, torch.ones(X.size(0), 1, device=X.device)], dim=1)
     return X_aug @ W
 
-def align_features_via_clusters(speakerB_feats, speakerA_feats, n_clusters=50):
+
+def align_features_via_local_affine(speakerB_feats, speakerA_feats, k=5):
     """
     Align Speaker B embeddings to Speaker A style using
-    cluster centroid matching and a global affine transform.
+    local affine mappings via nearest-neighbor neighborhoods.
     
     Args:
         speakerB_feats: (N_b, D) tensor
         speakerA_feats: (N_a, D) tensor
-        n_clusters: number of clusters for k-means (tune as needed)
+        k: number of neighbors to use per local affine
     
     Returns:
         B_feats_aligned: (N_b, D) tensor
     """
-    # 1. Cluster features independently
-    centroids_B = get_cluster_centroids(speakerB_feats, n_clusters)
-    centroids_A = get_cluster_centroids(speakerA_feats, n_clusters)
+    N_b, D = speakerB_feats.shape
+    matched_tgts = find_k_nearest_neighbors(speakerB_feats, speakerA_feats, k=k)  # (N_b, k, D)
 
-    # 2. Match clusters B -> A by cosine similarity
-    matched_indices = match_clusters(centroids_B, centroids_A)
-    matched_centroids_A = centroids_A[matched_indices]
+    aligned = []
+    for i in range(N_b):
+        X_src = speakerB_feats[i].unsqueeze(0).repeat(k, 1)   # (k, D)
+        X_tgt = matched_tgts[i]                               # (k, D)
 
-    # 3. Learn affine mapping from B centroids to matched A centroids
-    W = learn_affine_mapping(centroids_B, matched_centroids_A)
+        # Fit affine mapping locally
+        W = learn_local_affine(X_src, X_tgt)
 
-    # 4. Apply affine mapping globally to all B features
-    B_feats_aligned = apply_affine_mapping(speakerB_feats, W)
+        # Apply mapping to the original feature
+        aligned_feat = apply_affine_mapping(speakerB_feats[i].unsqueeze(0), W)
+        aligned.append(aligned_feat)
 
-    return B_feats_aligned
+    return torch.cat(aligned, dim=0)  # (N_b, D)

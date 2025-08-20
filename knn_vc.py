@@ -15,9 +15,6 @@ from feature_alignment import align_features_via_clusters
 from torch import optim
 import sample_from_cvae as cvae
 
-n_frames = None
-k_top = 1
-
 def largest_divisor_in_range(n, low=1, high=800_000):
     for d in range(high, low - 1, -1):
         if n % d == 0:
@@ -130,17 +127,14 @@ class kNN_VC(torch.nn.Module):
         return output_features
     
     @torch.inference_mode()
-    def expand_feature_space(self, target_id_dir, target_features, train_dir, train_ids, train_speakers):
+    def expand_feature_space(self, target_id, target_features, train_dir, train_ids, train_speakers):
         """ 
         Expands the source speaker's feature space by sampling from
         the most similar speaker in the librispeech train-clean set,
         and interpolating in feature space.
         """
-        # Load target speaker id
-        x = torch.load(target_id_dir)
-
         # Find most similar speaker and retrieve features
-        closest_speaker = kNN_VC.find_most_similar_speaker(x, train_ids, train_speakers)
+        closest_speaker = kNN_VC.find_most_similar_speaker(target_id, train_ids, train_speakers)
         print(f"Closest speaker is: {closest_speaker}, loading features...")
         feat_dir = train_dir / closest_speaker / f"{closest_speaker}.npy"
         train_features = np.load(feat_dir) 
@@ -153,7 +147,7 @@ class kNN_VC(torch.nn.Module):
 
         # Align Speaker B to A's style
         print(f"Extracting and aligning {diff} features from speaker {closest_speaker}...")
-        train_feats_aligned = align_features_via_clusters(train_features, target_features, n_clusters=250)
+        train_feats_aligned = align_features_via_clusters(train_features, target_features, n_clusters=149)
 
         # Concatenate
         expanded_features = torch.cat([target_features, train_feats_aligned], dim=0)
@@ -178,9 +172,22 @@ class kNN_VC(torch.nn.Module):
         # Find most similar speaker and return
         _, best_idx = torch.max(similarities, dim=0)
         return speakers[best_idx.item()]
+    
+    @torch.inference_mode()
+    def sample_from_cvae(self, target_features, target_id):
+        """ 
+        Retrieves CVAE sampled features to expand the target feature space
+        """
+        # Determine how many samples and retrieve
+        n_samples = 8996 - target_features.shape[0]
+        sampled_features = cvae.main(target_id, target_features, n_samples)
+        # Concatenate to existing features and return
+        expanded_features = torch.cat([target_features, sampled_features], dim=0)
+        return expanded_features
+        
 
         
-def main(target_length, set):
+def main(target_length, set, k):
     
     print(f"Using {target_length} secs of target audio for the {set} set")
 ### Specify filenames and other variables
@@ -200,21 +207,22 @@ def main(target_length, set):
     targets_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/librispeech_targets/dev/{target_length}")
     output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/dev/{target_length}")
     train_dir = Path("/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/train_100")
+    k_top = k
     
 ### Load in the neccessary models {SSL feature extractor (WavLM) and Vocoder (HiFi-GAN)}
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
     hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
     # Load speaker id's for sampling
-    # if (target_length < 180):
-    #     ids = torch.empty(0, 512)
-    #     speakers = np.array([], dtype=str)
-    #     for speaker_dir in tqdm(sorted(train_dir.iterdir()), desc="Loading training id's"):
-    #         speaker_name = speaker_dir.name
-    #         speaker_id_fn = speaker_dir / f"{speaker_name}_id.pt"
-    #         id = torch.load(speaker_id_fn)
-    #         id = id.unsqueeze(0)
-    #         speakers = np.append(speakers, speaker_name)
-    #         ids = torch.cat([ids, id], dim=0)
+    if (target_length < 180):
+        ids = torch.empty(0, 512).to(device)
+        speakers = np.array([], dtype=str)
+        for speaker_dir in tqdm(sorted(train_dir.iterdir()), desc="Loading training id's"):
+            speaker_name = speaker_dir.name
+            speaker_id_fn = speaker_dir / f"{speaker_name}_id.npy"
+            id = np.load(speaker_id_fn)
+            id = torch.from_numpy(id).unsqueeze(0).to(device)
+            speakers = np.append(speakers, speaker_name)
+            ids = torch.cat([ids, id], dim=0)
     
 ### Timing start and model initialization
     start = time.time()
@@ -260,15 +268,21 @@ def main(target_length, set):
                 target_fn = targets_dir / target / feat_fn_with_suffix
                 target_id_fn = targets_dir / target / id_fn_with_suffix
                 target_features = torch.load(target_fn)
+                target_id = torch.load(target_id_fn)
                 target_features = target_features.to(device)
+                target_id = target_id.to(device)
                 print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
+                print(f"Loaded target id with {target_id.shape[0]} dimensions")
 
                 # If the target features are too few, expand the feature space
-                # if (target_length < 180):
+                if (target_length < 180):
+                    print("Insuficcient target data, expanding target set...")
+                    expanded_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers)
+                    print(f"New target set has {expanded_features.shape[0]} features")
 
                 # Perform kNN matching to get output features
                 print("Performing kNN matching...")
-                output_features = vc_model.knn_matching(source_features, target_features)
+                output_features = vc_model.knn_matching(source_features, expanded_features)
                 
                 # Vocode and save the output
                 print("Matching complete, vocoding and saving output...")
@@ -300,5 +314,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--target_length', type=int, default=180, help='Target length for features')
     parser.add_argument('--set', type=str, default="dev", help='Librispeech set to use')
+    parser.add_argument('--k', type=int, default=4, help='k for kNN')
     args = parser.parse_args()
-    main(args.target_length, args.set)
+    main(args.target_length, args.set, args.k)
