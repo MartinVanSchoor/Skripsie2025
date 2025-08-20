@@ -47,7 +47,7 @@ def apply_affine_mapping(X, W):
     return X_aug @ W
 
 
-def align_features_via_local_affine(speakerB_feats, speakerA_feats, k=5):
+def align_features_via_local_affine(speakerB_feats, speakerA_feats, k=1):
     """
     Align Speaker B embeddings to Speaker A style using
     local affine mappings via nearest-neighbor neighborhoods.
