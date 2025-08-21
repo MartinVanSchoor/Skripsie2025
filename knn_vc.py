@@ -14,6 +14,7 @@ import torch.nn.functional as F
 from feature_alignment import align_features_via_clusters
 from torch import optim
 import sample_from_cvae as cvae
+from mkl import apply_mkl_batched
 
 def largest_divisor_in_range(n, low=1, high=800_000):
     for d in range(high, low - 1, -1):
@@ -187,7 +188,7 @@ class kNN_VC(torch.nn.Module):
         
 
         
-def main(target_length, set, k):
+def main(target_length, set, k, batch_size):
     
     print(f"Using {target_length} secs of target audio for the {set} set")
 ### Specify filenames and other variables
@@ -284,37 +285,46 @@ def main(target_length, set, k):
                 # print("Performing kNN matching...")
                 # output_features = vc_model.knn_matching(source_features, expanded_features)
                 
+                # Perform MKL mapping
+                #Sort dimensions by standard devation
+                idxes = torch.argsort(source_features.std(0), descending=True)
+                X0 = source_features[:, idxes].cpu().numpy()
+                X1 = target_features[:, idxes].cpu().numpy()
+                print(X0.shape)
+                print(X1.shape)
+                break
+                
                 # Vocode and save the output
-                print("Matching complete, vocoding and saving output...")
-                output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
-                torchaudio.save(output_fn, output_wav[None], vc_model.sr_target)
-                print("Succesfully converted")
-                torch.cuda.empty_cache() 
+                # print("Matching complete, vocoding and saving output...")
+                # output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
+                # torchaudio.save(output_fn, output_wav[None], vc_model.sr_target)
+                # print("Succesfully converted")
+                # torch.cuda.empty_cache() 
 
 ### Timing end
     end = time.time()
     print(f"Finished all conversions in time: {(end - start)/60:.2f} minutes")
     
 ### Performance evaluation
-    print("Evaluating similarity")
-    eer_mean, eer_std = evaluate_similarity(librispeech_dir, output_dir, eval_csv)
-    print("Evaluating intelligibility")
-    wer_mean, wer_std, cer_mean, cer_std = evaluate_intelligibility(librispeech_dir, output_dir)
-    with open(perf, "a") as f:
-        f.write(f"The performance of the kNN_VC model for {target_length} seconds of target audio from the {set}-clean set is:\n")
-        f.write("Intelligiblity:\n")
-        f.write(f"WER: {wer_mean} +- {wer_std}\n")
-        f.write(f"CER: {cer_mean} +- {cer_std}\n")
-        f.write("Similarity:\n")
-        f.write(f"EER: {eer_mean} +- {eer_std}\n")
-        f.write("\n")
+    # print("Evaluating similarity")
+    # eer_mean, eer_std = evaluate_similarity(librispeech_dir, output_dir, eval_csv)
+    # print("Evaluating intelligibility")
+    # wer_mean, wer_std, cer_mean, cer_std = evaluate_intelligibility(librispeech_dir, output_dir)
+    # with open(perf, "a") as f:
+    #     f.write(f"The performance of the kNN_VC model for {target_length} seconds of target audio from the {set}-clean set is:\n")
+    #     f.write("Intelligiblity:\n")
+    #     f.write(f"WER: {wer_mean} +- {wer_std}\n")
+    #     f.write(f"CER: {cer_mean} +- {cer_std}\n")
+    #     f.write("Similarity:\n")
+    #     f.write(f"EER: {eer_mean} +- {eer_std}\n")
+    #     f.write("\n")
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--target_length', type=int, default=180, help='Target length for features')
-    parser.add_argument('--set', type=str, default="dev", help='Librispeech set to use')
+    parser.add_argument('--target_length', type=int, default=3, help='Target length for features')
+    parser.add_argument('--set', type=str, default="dev", help='Librispeech set to use (dev or test)')
     parser.add_argument('--k', type=int, default=4, help='k for kNN')
     parser.add_argument('--batch_size', type=int, default=2, help='Batch size (K) for MKL mapping (how many dimensions per group)')
     args = parser.parse_args()
-    main(args.target_length, args.set, args.k)
+    main(args.target_length, args.set, args.k, args.batch_size)
