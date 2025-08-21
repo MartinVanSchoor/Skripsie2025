@@ -216,16 +216,16 @@ def main(target_length, set, k):
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
     hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
     # Load speaker id's for sampling
-    if (target_length < 180):
-        ids = torch.empty(0, 512).to(device)
-        speakers = np.array([], dtype=str)
-        for speaker_dir in tqdm(sorted(train_dir.iterdir()), desc="Loading training id's"):
-            speaker_name = speaker_dir.name
-            speaker_id_fn = speaker_dir / f"{speaker_name}_id.npy"
-            id = np.load(speaker_id_fn)
-            id = torch.from_numpy(id).unsqueeze(0).to(device)
-            speakers = np.append(speakers, speaker_name)
-            ids = torch.cat([ids, id], dim=0)
+    # if (target_length < 180):
+    #     ids = torch.empty(0, 512).to(device)
+    #     speakers = np.array([], dtype=str)
+    #     for speaker_dir in tqdm(sorted(train_dir.iterdir()), desc="Loading training id's"):
+    #         speaker_name = speaker_dir.name
+    #         speaker_id_fn = speaker_dir / f"{speaker_name}_id.npy"
+    #         id = np.load(speaker_id_fn)
+    #         id = torch.from_numpy(id).unsqueeze(0).to(device)
+    #         speakers = np.append(speakers, speaker_name)
+    #         ids = torch.cat([ids, id], dim=0)
     
 ### Timing start and model initialization
     start = time.time()
@@ -278,14 +278,14 @@ def main(target_length, set, k):
                 print(f"Loaded target id with {target_id.shape[0]} dimensions")
 
                 # If the target features are too few, expand the feature space
-                if (target_length < 180):
-                    print("Insuficcient target data, expanding target set...")
-                    expanded_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers)
-                    print(f"New target set has {expanded_features.shape[0]} features")
+                # if (target_length < 180):
+                #     print("Insuficcient target data, expanding target set...")
+                #     expanded_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers)
+                #     print(f"New target set has {expanded_features.shape[0]} features")
 
                 # Perform kNN matching to get output features
-                print("Performing kNN matching...")
-                output_features = vc_model.knn_matching(source_features, expanded_features)
+                # print("Performing kNN matching...")
+                # output_features = vc_model.knn_matching(source_features, expanded_features)
                 
                 # Vocode and save the output
                 print("Matching complete, vocoding and saving output...")
@@ -318,5 +318,6 @@ if __name__ == "__main__":
     parser.add_argument('--target_length', type=int, default=180, help='Target length for features')
     parser.add_argument('--set', type=str, default="dev", help='Librispeech set to use')
     parser.add_argument('--k', type=int, default=4, help='k for kNN')
+    parser.add_argument('--batch_size', type=int, default=2, help='Batch size (K) for MKL mapping (how many dimensions per group)')
     args = parser.parse_args()
     main(args.target_length, args.set, args.k)
