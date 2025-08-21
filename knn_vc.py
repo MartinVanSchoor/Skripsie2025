@@ -290,8 +290,10 @@ def main(target_length, set, k, batch_size):
                 idxes = torch.argsort(source_features.std(0), descending=True)
                 X0 = source_features[:, idxes].cpu().numpy()
                 X1 = target_features[:, idxes].cpu().numpy()
-                print(X0.shape)
-                print(X1.shape)
+                #Ensure batch size isn't too large, and obtain and apply mapping
+                batch_size = min(len(X1)-4, batch_size)
+                XR = apply_mkl_batched(X0, X1, batch_size)
+                print(XR.shape)
                 break
                 
                 # Vocode and save the output
