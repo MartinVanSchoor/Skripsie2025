@@ -293,15 +293,15 @@ def main(target_length, set, k, batch_size):
                 #Ensure batch size isn't too large, and obtain and apply mapping
                 batch_size = min(len(X1)-4, batch_size)
                 XR = apply_mkl_batched(X0, X1, batch_size)
-                print(XR.shape)
-                break
+                output_features = source_features.clone()
+                output_features[:, idxes] = torch.Tensor(XR).to(device)
                 
                 # Vocode and save the output
-                # print("Matching complete, vocoding and saving output...")
-                # output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
-                # torchaudio.save(output_fn, output_wav[None], vc_model.sr_target)
-                # print("Succesfully converted")
-                # torch.cuda.empty_cache() 
+                print("Matching complete, vocoding and saving output...")
+                output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
+                torchaudio.save(output_fn, output_wav[None], vc_model.sr_target)
+                print("Succesfully converted")
+                torch.cuda.empty_cache() 
 
 ### Timing end
     end = time.time()
