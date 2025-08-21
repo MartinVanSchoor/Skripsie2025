@@ -15,6 +15,9 @@ from feature_alignment import align_features_via_clusters
 from torch import optim
 import sample_from_cvae as cvae
 
+# Dimensions of WavLM features
+EMBED_LEN = 1024
+
 def largest_divisor_in_range(n, low=1, high=800_000):
     for d in range(high, low - 1, -1):
         if n % d == 0:
