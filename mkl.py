@@ -1,6 +1,4 @@
 import numpy as np
-import torch, torchaudio
-import scipy.io.wavfile as wavf
 
 # No. of dimensions of WavLM features
 EMBED_LEN = 1024
