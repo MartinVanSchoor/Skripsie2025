@@ -12,8 +12,6 @@ from pathlib import Path
 from tqdm import tqdm
 import torch.nn.functional as F
 from feature_alignment import align_features_via_clusters
-from torch import optim
-import sample_from_cvae as cvae
 from mkl import apply_mkl_batched
 
 def largest_divisor_in_range(n, low=1, high=800_000):
@@ -143,15 +141,26 @@ class kNN_VC(torch.nn.Module):
 
         # Retrieve the necessary amount of features and convert to appropriate device
         diff = 8996 - target_features.shape[0]
-        train_features = train_features[:diff].to(self.device) 
+        train_features = train_features[:101].to(self.device) 
         print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
 
-        # Align Speaker B to A's style
-        print(f"Extracting and aligning {diff} features from speaker {closest_speaker}...")
-        train_feats_aligned = align_features_via_clusters(train_features, target_features)
+        # Align Speaker B to A's style using cluster-based affine transformation
+        # print(f"Extracting and aligning {diff} features from speaker {closest_speaker}...")
+        # train_feats_aligned = align_features_via_clusters(train_features, target_features)
+
+        # Apply MKl transport mapping to make the training features more similar to the target features
+        #Sort dimensions by standard devation
+        # idxes = torch.argsort(train_features.std(0), descending=True)
+        # X0 = train_features[:, idxes].cpu().numpy()
+        # X1 = target_features[:, idxes].cpu().numpy()
+        # #Ensure batch size isn't too large, and obtain and apply mapping
+        # batch_size = min(len(X1)-4, batch_size)
+        # XR = apply_mkl_batched(X0, X1, batch_size)
+        # train_features = train_features.clone()
+        # train_features[:, idxes] = torch.tensor(XR, device=self.device)
 
         # Concatenate
-        expanded_features = torch.cat([target_features, train_feats_aligned], dim=0)
+        expanded_features = torch.cat([target_features, train_features], dim=0)
 
         return expanded_features
     
@@ -173,18 +182,6 @@ class kNN_VC(torch.nn.Module):
         # Find most similar speaker and return
         _, best_idx = torch.max(similarities, dim=0)
         return speakers[best_idx.item()]
-    
-    @torch.inference_mode()
-    def sample_from_cvae(self, target_features, target_id):
-        """ 
-        Retrieves CVAE sampled features to expand the target feature space
-        """
-        # Determine how many samples and retrieve
-        n_samples = 8996 - target_features.shape[0]
-        sampled_features = cvae.main(target_id, target_features, n_samples)
-        # Concatenate to existing features and return
-        expanded_features = torch.cat([target_features, sampled_features], dim=0)
-        return expanded_features
         
 
         
@@ -207,23 +204,24 @@ def main(target_length, set, k, batch_size):
     librispeech_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/librispeech/LibriSpeech/dev-clean")
     targets_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/librispeech_targets/dev/{target_length}")
     output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/dev/{target_length}")
-    train_dir = Path("/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/train_100")
+    # train_dir = Path("/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/train_100")
+    train_dir = Path("/mnt/d/librispeech_train/train")
     k_top = k
     
 ### Load in the neccessary models {SSL feature extractor (WavLM) and Vocoder (HiFi-GAN)}
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
     hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
     # Load speaker id's for sampling
-    # if (target_length < 180):
-    #     ids = torch.empty(0, 512).to(device)
-    #     speakers = np.array([], dtype=str)
-    #     for speaker_dir in tqdm(sorted(train_dir.iterdir()), desc="Loading training id's"):
-    #         speaker_name = speaker_dir.name
-    #         speaker_id_fn = speaker_dir / f"{speaker_name}_id.npy"
-    #         id = np.load(speaker_id_fn)
-    #         id = torch.from_numpy(id).unsqueeze(0).to(device)
-    #         speakers = np.append(speakers, speaker_name)
-    #         ids = torch.cat([ids, id], dim=0)
+    if (target_length < 180):
+        ids = torch.empty(0, 512).to(device)
+        speakers = np.array([], dtype=str)
+        for speaker_dir in tqdm(sorted(train_dir.iterdir()), desc="Loading training id's"):
+            speaker_name = speaker_dir.name
+            speaker_id_fn = speaker_dir / f"{speaker_name}_id.npy"
+            id = np.load(speaker_id_fn)
+            id = torch.from_numpy(id).unsqueeze(0).to(device)
+            speakers = np.append(speakers, speaker_name)
+            ids = torch.cat([ids, id], dim=0)
     
 ### Timing start and model initialization
     start = time.time()
@@ -238,7 +236,8 @@ def main(target_length, set, k, batch_size):
             if line[-1] == "0":
                 
                 # Set up filepath and source and target variables
-                (source, target, source_key, _, _) = line.split(",")
+                (source, target, source_key, target_key, _) = line.split(",")
+                #Source filename
                 source_key_split = source_key.split("-")
                 source_wav_fn = (
                     librispeech_dir
@@ -247,11 +246,14 @@ def main(target_length, set, k, batch_size):
                     / source_key.split("/")[0]
                 ).with_suffix(".flac")
                 clip = source_key.split("/")[0]
+                #Output filename
                 cur_output_dir = Path(output_dir) / source_key.split("/")[0]
                 cur_output_dir.mkdir(parents=True, exist_ok=True)
                 output_fn = (cur_output_dir / source_key.split("/")[1]).with_suffix(
                     ".wav"
                 )
+                #Target filename
+                target_wav_fn = (librispeech_dir / target_key).with_suffix(".flac")
                 # if output_fn.exists():
                 #     print(f"Skipping {clip}, already processed.")
                 #     continue
@@ -262,7 +264,7 @@ def main(target_length, set, k, batch_size):
                 source_features = vc_model.get_features(source_wav_fn, mode=1)
                 print(f"Extracted {source_features.shape[0]} features from source speaker: {source}")
                 
-                # Load target features from .pt file
+                # # Load target features from .pt file
                 print("Loading in target features...")
                 feat_fn_with_suffix = target + ".pt"
                 id_fn_with_suffix = target + "_id.pt"
@@ -275,15 +277,20 @@ def main(target_length, set, k, batch_size):
                 print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
                 print(f"Loaded target id with {target_id.shape[0]} dimensions")
 
+                # Extract target features from target utterance
+                # print("Extracting source features...")
+                # target_features = vc_model.get_features(target_wav_fn, mode=1)
+                # print(f"Extracted {target_features.shape[0]} features from target speaker: {target}")
+    
                 # If the target features are too few, expand the feature space
-                # if (target_length < 180):
-                #     print("Insuficcient target data, expanding target set...")
-                #     expanded_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers)
-                #     print(f"New target set has {expanded_features.shape[0]} features")
+                if (target_length < 180):
+                    print("Insuficcient target data, expanding target set...")
+                    target_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers)
+                    print(f"New target set has {target_features.shape[0]} features")
 
                 # Perform kNN matching to get output features
                 # print("Performing kNN matching...")
-                # output_features = vc_model.knn_matching(source_features, expanded_features)
+                # output_features = vc_model.knn_matching(source_features, target_features)
                 
                 # Perform MKL mapping
                 #Sort dimensions by standard devation
@@ -308,18 +315,18 @@ def main(target_length, set, k, batch_size):
     print(f"Finished all conversions in time: {(end - start)/60:.2f} minutes")
     
 ### Performance evaluation
-    # print("Evaluating similarity")
-    # eer_mean, eer_std = evaluate_similarity(librispeech_dir, output_dir, eval_csv)
-    # print("Evaluating intelligibility")
-    # wer_mean, wer_std, cer_mean, cer_std = evaluate_intelligibility(librispeech_dir, output_dir)
-    # with open(perf, "a") as f:
-    #     f.write(f"The performance of the kNN_VC model for {target_length} seconds of target audio from the {set}-clean set is:\n")
-    #     f.write("Intelligiblity:\n")
-    #     f.write(f"WER: {wer_mean} +- {wer_std}\n")
-    #     f.write(f"CER: {cer_mean} +- {cer_std}\n")
-    #     f.write("Similarity:\n")
-    #     f.write(f"EER: {eer_mean} +- {eer_std}\n")
-    #     f.write("\n")
+    print("Evaluating similarity")
+    eer_mean, eer_std = evaluate_similarity(librispeech_dir, output_dir, eval_csv)
+    print("Evaluating intelligibility")
+    wer_mean, wer_std, cer_mean, cer_std = evaluate_intelligibility(librispeech_dir, output_dir)
+    with open(perf, "a") as f:
+        f.write(f"The performance of the kNN_VC model for {target_length} seconds of target audio and K={batch_size} from the {set}-clean set is:\n")
+        f.write("Intelligiblity:\n")
+        f.write(f"WER: {wer_mean} +- {wer_std}\n")
+        f.write(f"CER: {cer_mean} +- {cer_std}\n")
+        f.write("Similarity:\n")
+        f.write(f"EER: {eer_mean} +- {eer_std}\n")
+        f.write("\n")
 
 if __name__ == "__main__":
     import argparse
