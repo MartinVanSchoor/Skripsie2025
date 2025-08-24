@@ -126,7 +126,7 @@ class kNN_VC(torch.nn.Module):
         return output_features
     
     @torch.inference_mode()
-    def expand_feature_space(self, target_id, target_features, train_dir, train_ids, train_speakers):
+    def expand_feature_space(self, target_id, target_features, train_dir, train_ids, train_speakers, batch_size):
         """ 
         Expands the source speaker's feature space by sampling from
         the most similar speaker in the librispeech train-clean set,
@@ -141,7 +141,7 @@ class kNN_VC(torch.nn.Module):
 
         # Retrieve the necessary amount of features and convert to appropriate device
         diff = 8996 - target_features.shape[0]
-        train_features = train_features[:101].to(self.device) 
+        train_features = train_features[:diff].to(self.device) 
         print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
 
         # Align Speaker B to A's style using cluster-based affine transformation
@@ -150,14 +150,14 @@ class kNN_VC(torch.nn.Module):
 
         # Apply MKl transport mapping to make the training features more similar to the target features
         #Sort dimensions by standard devation
-        # idxes = torch.argsort(train_features.std(0), descending=True)
-        # X0 = train_features[:, idxes].cpu().numpy()
-        # X1 = target_features[:, idxes].cpu().numpy()
-        # #Ensure batch size isn't too large, and obtain and apply mapping
-        # batch_size = min(len(X1)-4, batch_size)
-        # XR = apply_mkl_batched(X0, X1, batch_size)
-        # train_features = train_features.clone()
-        # train_features[:, idxes] = torch.tensor(XR, device=self.device)
+        idxes = torch.argsort(train_features.std(0), descending=True)
+        X0 = train_features[:, idxes].cpu().numpy()
+        X1 = target_features[:, idxes].cpu().numpy()
+        #Ensure batch size isn't too large, and obtain and apply mapping
+        batch_size = min(len(X1)-4, batch_size)
+        XR = apply_mkl_batched(X0, X1, batch_size)
+        train_features = train_features.clone()
+        train_features[:, idxes] = torch.tensor(XR, device=self.device)
 
         # Concatenate
         expanded_features = torch.cat([target_features, train_features], dim=0)
@@ -200,10 +200,10 @@ def main(target_length, set, k, batch_size):
  ## For Desktop
     device = "cuda"
     perf = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/performance/red_csv_vanilla.txt"
-    eval_csv = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/eval_trimmed.csv")
+    eval_csv = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/eval.csv")
     librispeech_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/librispeech/LibriSpeech/dev-clean")
     targets_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/librispeech_targets/dev/{target_length}")
-    output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/dev/{target_length}")
+    output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/dev/real")
     # train_dir = Path("/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/train_100")
     train_dir = Path("/mnt/d/librispeech_train/train")
     k_top = k
@@ -265,43 +265,43 @@ def main(target_length, set, k, batch_size):
                 print(f"Extracted {source_features.shape[0]} features from source speaker: {source}")
                 
                 # # Load target features from .pt file
-                print("Loading in target features...")
-                feat_fn_with_suffix = target + ".pt"
+                # print("Loading in target features...")
+                # feat_fn_with_suffix = target + ".pt"
                 id_fn_with_suffix = target + "_id.pt"
-                target_fn = targets_dir / target / feat_fn_with_suffix
+                # target_fn = targets_dir / target / feat_fn_with_suffix
                 target_id_fn = targets_dir / target / id_fn_with_suffix
-                target_features = torch.load(target_fn)
+                # target_features = torch.load(target_fn)
                 target_id = torch.load(target_id_fn)
-                target_features = target_features.to(device)
+                # target_features = target_features.to(device)
                 target_id = target_id.to(device)
-                print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
-                print(f"Loaded target id with {target_id.shape[0]} dimensions")
+                # print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
+                # print(f"Loaded target id with {target_id.shape[0]} dimensions")
 
                 # Extract target features from target utterance
-                # print("Extracting source features...")
-                # target_features = vc_model.get_features(target_wav_fn, mode=1)
-                # print(f"Extracted {target_features.shape[0]} features from target speaker: {target}")
+                print("Extracting source features...")
+                target_features = vc_model.get_features(target_wav_fn, mode=1)
+                print(f"Extracted {target_features.shape[0]} features from target speaker: {target}")
     
                 # If the target features are too few, expand the feature space
                 if (target_length < 180):
                     print("Insuficcient target data, expanding target set...")
-                    target_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers)
+                    target_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers, batch_size)
                     print(f"New target set has {target_features.shape[0]} features")
 
                 # Perform kNN matching to get output features
-                # print("Performing kNN matching...")
-                # output_features = vc_model.knn_matching(source_features, target_features)
+                print("Performing kNN matching...")
+                output_features = vc_model.knn_matching(source_features, target_features)
                 
                 # Perform MKL mapping
-                #Sort dimensions by standard devation
-                idxes = torch.argsort(source_features.std(0), descending=True)
-                X0 = source_features[:, idxes].cpu().numpy()
-                X1 = target_features[:, idxes].cpu().numpy()
-                #Ensure batch size isn't too large, and obtain and apply mapping
-                batch_size = min(len(X1)-4, batch_size)
-                XR = apply_mkl_batched(X0, X1, batch_size)
-                output_features = source_features.clone()
-                output_features[:, idxes] = torch.Tensor(XR).to(device)
+                # #Sort dimensions by standard devation
+                # idxes = torch.argsort(source_features.std(0), descending=True)
+                # X0 = source_features[:, idxes].cpu().numpy()
+                # X1 = target_features[:, idxes].cpu().numpy()
+                # #Ensure batch size isn't too large, and obtain and apply mapping
+                # batch_size = min(len(X1)-4, batch_size)
+                # XR = apply_mkl_batched(X0, X1, batch_size)
+                # output_features = source_features.clone()
+                # output_features[:, idxes] = torch.Tensor(XR).to(device)
                 
                 # Vocode and save the output
                 print("Matching complete, vocoding and saving output...")
