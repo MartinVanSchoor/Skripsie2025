@@ -11,7 +11,6 @@ from types import SimpleNamespace
 from pathlib import Path
 from tqdm import tqdm
 import torch.nn.functional as F
-from feature_alignment import align_features_via_clusters
 from mkl import apply_mkl_batched
 
 def largest_divisor_in_range(n, low=1, high=800_000):
@@ -224,7 +223,7 @@ def main(target_length, set, k, batch_size):
     eval_csv = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/eval.csv")
     librispeech_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/librispeech/LibriSpeech/dev-clean")
     targets_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/librispeech_targets/dev/{target_length}")
-    output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/dev/real")
+    output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/dev/real{target_length}")
     # train_dir = Path("/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/train_100")
     train_dir = Path("/mnt/d/librispeech_train/train")
     k_top = k
@@ -233,16 +232,16 @@ def main(target_length, set, k, batch_size):
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
     hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
     # Load speaker id's for sampling
-    if (target_length < 180):
-        ids = torch.empty(0, 512).to(device)
-        speakers = np.array([], dtype=str)
-        for speaker_dir in tqdm(sorted(train_dir.iterdir()), desc="Loading training id's"):
-            speaker_name = speaker_dir.name
-            speaker_id_fn = speaker_dir / f"{speaker_name}_id.npy"
-            id = np.load(speaker_id_fn)
-            id = torch.from_numpy(id).unsqueeze(0).to(device)
-            speakers = np.append(speakers, speaker_name)
-            ids = torch.cat([ids, id], dim=0)
+    # if (target_length < 180):
+    #     ids = torch.empty(0, 512).to(device)
+    #     speakers = np.array([], dtype=str)
+    #     for speaker_dir in tqdm(sorted(train_dir.iterdir()), desc="Loading training id's"):
+    #         speaker_name = speaker_dir.name
+    #         speaker_id_fn = speaker_dir / f"{speaker_name}_id.npy"
+    #         id = np.load(speaker_id_fn)
+    #         id = torch.from_numpy(id).unsqueeze(0).to(device)
+    #         speakers = np.append(speakers, speaker_name)
+    #         ids = torch.cat([ids, id], dim=0)
     
 ### Timing start and model initialization
     start = time.time()
@@ -285,29 +284,29 @@ def main(target_length, set, k, batch_size):
                 source_features = vc_model.get_features(source_wav_fn, mode=1)
                 print(f"Extracted {source_features.shape[0]} features from source speaker: {source}")
                 
-                # # Load target features from .pt file
+                # Load target features from .pt file
                 print("Loading in target features...")
-                # feat_fn_with_suffix = target + ".pt"
+                feat_fn_with_suffix = target + ".pt"
                 id_fn_with_suffix = target + "_id.pt"
-                # target_fn = targets_dir / target / feat_fn_with_suffix
+                target_fn = targets_dir / target / feat_fn_with_suffix
                 target_id_fn = targets_dir / target / id_fn_with_suffix
-                # target_features = torch.load(target_fn)
+                target_features = torch.load(target_fn)
                 target_id = torch.load(target_id_fn)
-                # target_features = target_features.to(device)
+                target_features = target_features.to(device)
                 target_id = target_id.to(device)
-                # print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
+                print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
                 print(f"Loaded target id with {target_id.shape[0]} dimensions")
 
-                # Extract target features from target utterance
-                print("Extracting source features...")
-                target_features = vc_model.get_features(target_wav_fn, mode=1)
-                print(f"Extracted {target_features.shape[0]} features from target speaker: {target}")
+                # # Extract target features from target utterance
+                # print("Extracting source features...")
+                # target_features = vc_model.get_features(target_wav_fn, mode=1)
+                # print(f"Extracted {target_features.shape[0]} features from target speaker: {target}")
     
                 # If the target features are too few, expand the feature space
-                if (target_features.shape[0] < 260): 
-                    print("Insuficcient target data, expanding target set...")
-                    target_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers, batch_size)
-                    print(f"New target set has {target_features.shape[0]} features")
+                # if (target_features.shape[0] < 260): 
+                #     print("Insuficcient target data, expanding target set...")
+                #     target_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers, batch_size)
+                #     print(f"New target set has {target_features.shape[0]} features")
 
                 # Perform kNN matching to get output features
                 # print("Performing kNN matching...")
