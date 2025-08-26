@@ -1,4 +1,2 @@
-python3 knn_vc.py --batch_size 4
-python3 knn_vc.py --batch_size 32
-python3 knn_vc.py --batch_size 128
-python3 knn_vc.py --batch_size 256
+python3 knn_vc.py --target_length 6 --batch_size 256 --k 4
+python3 knn_vc.py --target_length 6 --batch_size 256 --k 3

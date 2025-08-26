@@ -41,13 +41,14 @@ def evaluate_similarity(groundtruth, converted, eval):
     return eer_mean, eer_std
 
 class kNN_VC(torch.nn.Module):
-    def __init__(self, wavlm, hifigan, k, device="cpu"):
+    def __init__(self, wavlm, hifigan, k, device, batch_size):
         super().__init__()
         self.wavlm = wavlm.eval()
         self.hifigan = hifigan.eval()
         self.k = k
         self.device = device 
         self.sr_target = 16000
+        self.batch_size = batch_size
         
     @torch.inference_mode()
     def get_features(self, audio_fn, mode):
@@ -140,7 +141,12 @@ class kNN_VC(torch.nn.Module):
         train_features = torch.from_numpy(train_features).to("cpu")
 
         # Retrieve the necessary amount of features and convert to appropriate device
-        diff = 8996 - target_features.shape[0]
+        #kNN approach
+        # diff = 8996 - target_features.shape[0]
+        # train_features = train_features[:diff].to(self.device) 
+        # print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
+        #MKL approach
+        diff = 260 - target_features.shape[0]
         train_features = train_features[:diff].to(self.device) 
         print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
 
@@ -150,14 +156,14 @@ class kNN_VC(torch.nn.Module):
 
         # Apply MKl transport mapping to make the training features more similar to the target features
         #Sort dimensions by standard devation
-        idxes = torch.argsort(train_features.std(0), descending=True)
-        X0 = train_features[:, idxes].cpu().numpy()
-        X1 = target_features[:, idxes].cpu().numpy()
-        #Ensure batch size isn't too large, and obtain and apply mapping
-        batch_size = min(len(X1)-4, batch_size)
-        XR = apply_mkl_batched(X0, X1, batch_size)
-        train_features = train_features.clone()
-        train_features[:, idxes] = torch.tensor(XR, device=self.device)
+        # idxes = torch.argsort(train_features.std(0), descending=True)
+        # X0 = train_features[:, idxes].cpu().numpy()
+        # X1 = target_features[:, idxes].cpu().numpy()
+        # #Ensure batch size isn't too large, and obtain and apply mapping
+        # batch_size = min(len(X1)-4, batch_size)
+        # XR = apply_mkl_batched(X0, X1, batch_size)
+        # train_features = train_features.clone()
+        # train_features[:, idxes] = torch.tensor(XR, device=self.device)
 
         # Concatenate
         expanded_features = torch.cat([target_features, train_features], dim=0)
@@ -182,8 +188,23 @@ class kNN_VC(torch.nn.Module):
         # Find most similar speaker and return
         _, best_idx = torch.max(similarities, dim=0)
         return speakers[best_idx.item()]
-        
+    
+    @torch.inference_mode()
+    def perform_mkl_mapping(self, source_features, target_features):
+        """ 
+        Performs Monge-Kantorovich linear transport mapping and returns the result
+        """
+        #Sort dimensions by standard devation
+        idxes = torch.argsort(source_features.std(0), descending=True)
+        X0 = source_features[:, idxes].cpu().numpy()
+        X1 = target_features[:, idxes].cpu().numpy()
 
+        #Ensure batch size isn't too large, and obtain and apply mapping
+        self.batch_size = min(len(X1)-4, self.batch_size)
+        XR = apply_mkl_batched(X0, X1, self.batch_size)
+        output_features = source_features.clone()
+        output_features[:, idxes] = torch.Tensor(XR).to(self.device)
+        return output_features
         
 def main(target_length, set, k, batch_size):
     
@@ -225,7 +246,7 @@ def main(target_length, set, k, batch_size):
     
 ### Timing start and model initialization
     start = time.time()
-    vc_model = kNN_VC(wavlm, hifigan, k_top, device)
+    vc_model = kNN_VC(wavlm, hifigan, k_top, device, batch_size)
 
 ### Conversion of librispeech dev-clean set data according to eval.csv 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -234,7 +255,7 @@ def main(target_length, set, k, batch_size):
         for line in tqdm(f.readlines()):
             line = line.strip()
             if line[-1] == "0":
-                
+
                 # Set up filepath and source and target variables
                 (source, target, source_key, target_key, _) = line.split(",")
                 #Source filename
@@ -265,7 +286,7 @@ def main(target_length, set, k, batch_size):
                 print(f"Extracted {source_features.shape[0]} features from source speaker: {source}")
                 
                 # # Load target features from .pt file
-                # print("Loading in target features...")
+                print("Loading in target features...")
                 # feat_fn_with_suffix = target + ".pt"
                 id_fn_with_suffix = target + "_id.pt"
                 # target_fn = targets_dir / target / feat_fn_with_suffix
@@ -275,7 +296,7 @@ def main(target_length, set, k, batch_size):
                 # target_features = target_features.to(device)
                 target_id = target_id.to(device)
                 # print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
-                # print(f"Loaded target id with {target_id.shape[0]} dimensions")
+                print(f"Loaded target id with {target_id.shape[0]} dimensions")
 
                 # Extract target features from target utterance
                 print("Extracting source features...")
@@ -283,25 +304,18 @@ def main(target_length, set, k, batch_size):
                 print(f"Extracted {target_features.shape[0]} features from target speaker: {target}")
     
                 # If the target features are too few, expand the feature space
-                if (target_length < 180):
+                if (target_features.shape[0] < 260): 
                     print("Insuficcient target data, expanding target set...")
                     target_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers, batch_size)
                     print(f"New target set has {target_features.shape[0]} features")
 
                 # Perform kNN matching to get output features
-                print("Performing kNN matching...")
-                output_features = vc_model.knn_matching(source_features, target_features)
+                # print("Performing kNN matching...")
+                # output_features = vc_model.knn_matching(source_features, target_features)
                 
                 # Perform MKL mapping
-                # #Sort dimensions by standard devation
-                # idxes = torch.argsort(source_features.std(0), descending=True)
-                # X0 = source_features[:, idxes].cpu().numpy()
-                # X1 = target_features[:, idxes].cpu().numpy()
-                # #Ensure batch size isn't too large, and obtain and apply mapping
-                # batch_size = min(len(X1)-4, batch_size)
-                # XR = apply_mkl_batched(X0, X1, batch_size)
-                # output_features = source_features.clone()
-                # output_features[:, idxes] = torch.Tensor(XR).to(device)
+                print("Performing MKL mapping")
+                output_features = vc_model.perform_mkl_mapping(source_features, target_features)
                 
                 # Vocode and save the output
                 print("Matching complete, vocoding and saving output...")
