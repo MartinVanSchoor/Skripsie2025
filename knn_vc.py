@@ -155,14 +155,7 @@ class kNN_VC(torch.nn.Module):
 
         # Apply MKl transport mapping to make the training features more similar to the target features
         #Sort dimensions by standard devation
-        idxes = torch.argsort(train_features.std(0), descending=True)
-        X0 = train_features[:, idxes].cpu().numpy()
-        X1 = target_features[:, idxes].cpu().numpy()
-        #Ensure batch size isn't too large, and obtain and apply mapping
-        batch_size = min(len(X1)-4, batch_size)
-        XR = apply_mkl_batched(X0, X1, batch_size)
-        train_features = train_features.clone()
-        train_features[:, idxes] = torch.tensor(XR, device=self.device)
+        train_features = self.perform_mkl_mapping(train_features, target_features)
 
         # Concatenate
         expanded_features = torch.cat([target_features, train_features], dim=0)
@@ -220,7 +213,7 @@ def main(target_length, set, k, batch_size):
  ## For Desktop
     device = "cuda"
     perf = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/performance/red_csv_vanilla.txt"
-    eval_csv = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/eval.csv")
+    eval_csv = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/eval_trimmed.csv")
     librispeech_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/librispeech/LibriSpeech/dev-clean")
     targets_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/librispeech_targets/dev/{target_length}")
     output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/dev/{target_length}")
@@ -274,8 +267,8 @@ def main(target_length, set, k, batch_size):
                 )
                 #Target filename
                 target_wav_fn = (librispeech_dir / target_key).with_suffix(".flac")
-                # if output_fn.exists():
-                #     print(f"Skipping {clip}, already processed.")
+                # counter = counter + 1
+                # if counter<6000:
                 #     continue
                 print(f"Converting speaker {source} clip: {clip} to speaker {target}")
                 
@@ -321,7 +314,7 @@ def main(target_length, set, k, batch_size):
                 output_wav = vc_model.vocode(output_features[None].to(device)).cpu().squeeze()
                 torchaudio.save(output_fn, output_wav[None], vc_model.sr_target)
                 print("Succesfully converted")
-                torch.cuda.empty_cache() 
+                torch.cuda.empty_cache()   
 
 ### Timing end
     end = time.time()

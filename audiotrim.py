@@ -1,36 +1,68 @@
 from pathlib import Path
 from tqdm import tqdm
 import numpy as np
+import torchaudio
 import torch
-
-dir_old = Path("/mnt/d/librispeech_train/train")
-dir_new = Path("/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/train_mini")
-count = 0
-
-for speaker_dir in tqdm(sorted(dir_old.iterdir()), desc="Processing speakers"):
-    if speaker_dir.name == "1535":
-        continue
-
-    # feat_fn = f"{speaker_dir.name}.npy"
-    # feat_path_old = speaker_dir / feat_fn
-    id_fn = f"{speaker_dir.name}_id.pt"
-    id_path_old = speaker_dir / id_fn
-    id_path_new = speaker_dir / f"{speaker_dir.name}_id.npy"
-
-    # Load the tensor & convert to numpy
-    # features = np.load(feat_path_old)
-    ids = torch.load(id_path_old)
-    ids = ids.numpy()
-    np.save(id_path_new, ids)
-    Path.unlink(id_path_old)
-
-    # speaker_dir_new = dir_new / speaker_dir.name
-    # feat_path_new = speaker_dir_new / f"{speaker_dir.name}.npy"
-    # id_path_new = speaker_dir_new / f"{speaker_dir.name}_id.npy"
-    
-    # count = count + 1
-    # if (count % 5 == 0):
-    #     speaker_dir_new.mkdir(parents=True, exist_ok=True)
-    #     np.save(feat_path_new, features)
-    #     np.save(id_path_new, ids)
+import torchaudio.functional as F
+from knn_vc import kNN_VC
+from sklearn.neighbors import NearestNeighbors
+from mkl import apply_mkl_batched
         
+device = "cuda"
+batch_size = 256
+dir1 = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/target/theo1.wav"
+dir2 = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/target/theo2.wav"
+dir3 = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/target/theo3.wav"
+source_dir = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/source/source_to_theo.wav"
+dir_out = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/output/theo.wav"
+
+wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
+hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
+
+clip1, sr1 = torchaudio.load(dir1)
+clip2, sr2 = torchaudio.load(dir2)
+clip3, sr3 = torchaudio.load(dir3)
+clip, sr = torchaudio.load(source_dir)
+audio = torch.cat([clip1, clip2, clip3], dim=1)
+target = F.resample(audio, orig_freq=sr1, new_freq=16000)
+source = F.resample(clip, orig_freq=sr, new_freq=16000)
+target = target.to(device)
+source = source.to(device)
+
+# extract source features
+with torch.no_grad():
+    source_features, _ = wavlm.extract_features(source, output_layer = 6)
+source_features = source_features.squeeze()
+print(source_features.shape)
+
+chunk_length = 80000
+chunk_list = []
+for i in range(target.shape[1]//chunk_length):
+    chunk = target[:,(i*chunk_length):((i+1)*chunk_length)]
+    with torch.no_grad():
+        chunk_features, _ = wavlm.extract_features(chunk, output_layer=6)
+    chunk_features = chunk_features.squeeze()
+    chunk_list.append(chunk_features)
+target_features = torch.cat(chunk_list, dim=0)
+print(target_features.shape)
+
+# Convert to numpy for sklearn
+source_np = source_features.cpu().numpy()
+target_np = target_features.cpu().numpy()
+# Fit NearestNeighbors using cosine distance
+nn = NearestNeighbors(n_neighbors=4, metric="cosine")
+nn.fit(target_np)
+# Find 4 nearest neighbors for each source row
+distances, indices = nn.kneighbors(source_np)  # indices: (N_source, 4)
+# Average the 4 neighbors for each source entry
+averaged = np.array([
+    target_np[neighbor_indices].mean(axis=0)
+    for neighbor_indices in indices
+])  
+# Convert back to torch
+output_features = torch.from_numpy(averaged).to(device) 
+
+wav_hat = hifigan(output_features[None].to(device))
+wav_hat = wav_hat.squeeze(1)
+output_wav = wav_hat.cpu().squeeze()
+torchaudio.save(dir_out, output_wav[None], 16000)
