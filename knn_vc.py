@@ -141,13 +141,13 @@ class kNN_VC(torch.nn.Module):
 
         # Retrieve the necessary amount of features and convert to appropriate device
         #kNN approach
-        diff = 8996 - target_features.shape[0]
-        train_features = train_features[:diff].to(self.device) 
-        print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
-        #MKL approach
-        # diff = 260 - target_features.shape[0]
+        # diff = 8996 - target_features.shape[0]
         # train_features = train_features[:diff].to(self.device) 
         # print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
+        #MKL approach
+        diff = 259 - target_features.shape[0]
+        train_features = train_features[:diff].to(self.device) 
+        print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
 
         # Align Speaker B to A's style using cluster-based affine transformation
         # print(f"Extracting and aligning {diff} features from speaker {closest_speaker}...")
@@ -155,7 +155,7 @@ class kNN_VC(torch.nn.Module):
 
         # Apply MKl transport mapping to make the training features more similar to the target features
         #Sort dimensions by standard devation
-        train_features = self.perform_mkl_mapping(train_features, target_features)
+        # train_features = self.perform_mkl_mapping(train_features, target_features)
 
         # Concatenate
         expanded_features = torch.cat([target_features, train_features], dim=0)
@@ -213,10 +213,10 @@ def main(target_length, set, k, batch_size):
  ## For Desktop
     device = "cuda"
     perf = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/performance/red_csv_vanilla.txt"
-    eval_csv = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/eval_trimmed.csv")
+    eval_csv = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/eval.csv")
     librispeech_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/librispeech/LibriSpeech/dev-clean")
     targets_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/librispeech_targets/dev/{target_length}")
-    output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/dev/{target_length}")
+    output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/dev/real")
     # train_dir = Path("/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/train_100")
     train_dir = Path("/mnt/d/librispeech_train/train")
     k_top = k
@@ -267,8 +267,7 @@ def main(target_length, set, k, batch_size):
                 )
                 #Target filename
                 target_wav_fn = (librispeech_dir / target_key).with_suffix(".flac")
-                # counter = counter + 1
-                # if counter<6000:
+                # if output_fn.exists():
                 #     continue
                 print(f"Converting speaker {source} clip: {clip} to speaker {target}")
                 
@@ -302,12 +301,12 @@ def main(target_length, set, k, batch_size):
                     print(f"New target set has {target_features.shape[0]} features")
 
                 # Perform kNN matching to get output features
-                print("Performing kNN matching...")
-                output_features = vc_model.knn_matching(source_features, target_features)
+                # print("Performing kNN matching...")
+                # output_features = vc_model.knn_matching(source_features, target_features)
                 
                 # Perform MKL mapping
-                # print("Performing MKL mapping")
-                # output_features = vc_model.perform_mkl_mapping(source_features, target_features)
+                print("Performing MKL mapping")
+                output_features = vc_model.perform_mkl_mapping(source_features, target_features)
                 
                 # Vocode and save the output
                 print("Matching complete, vocoding and saving output...")

@@ -10,21 +10,21 @@ from mkl import apply_mkl_batched
         
 device = "cuda"
 batch_size = 256
-dir1 = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/target/theo1.wav"
-dir2 = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/target/theo2.wav"
-dir3 = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/target/theo3.wav"
-source_dir = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/source/source_to_theo.wav"
-dir_out = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/output/theo.wav"
+dir1 = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/target/louw1.wav"
+dir2 = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/target/louw2.wav"
+dir3 = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/target/louw3.wav"
+source_dir = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/source/source_to_louw.wav"
+dir_out = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/output/louw.wav"
 
 wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
 hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
 
-clip1, sr1 = torchaudio.load(dir1)
-clip2, sr2 = torchaudio.load(dir2)
-clip3, sr3 = torchaudio.load(dir3)
+clip1, _ = torchaudio.load(dir1)
+clip2, _ = torchaudio.load(dir2)
+clip3, _ = torchaudio.load(dir3)
 clip, sr = torchaudio.load(source_dir)
 audio = torch.cat([clip1, clip2, clip3], dim=1)
-target = F.resample(audio, orig_freq=sr1, new_freq=16000)
+target = F.resample(audio, orig_freq=sr, new_freq=16000)
 source = F.resample(clip, orig_freq=sr, new_freq=16000)
 target = target.to(device)
 source = source.to(device)
