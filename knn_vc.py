@@ -141,21 +141,16 @@ class kNN_VC(torch.nn.Module):
 
         # Retrieve the necessary amount of features and convert to appropriate device
         #kNN approach
-        # diff = 8996 - target_features.shape[0]
-        # train_features = train_features[:diff].to(self.device) 
-        # print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
-        #MKL approach
-        diff = 259 - target_features.shape[0]
+        diff = 8996 - target_features.shape[0]
         train_features = train_features[:diff].to(self.device) 
         print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
-
-        # Align Speaker B to A's style using cluster-based affine transformation
-        # print(f"Extracting and aligning {diff} features from speaker {closest_speaker}...")
-        # train_feats_aligned = align_features_via_clusters(train_features, target_features)
+        #MKL approach
+        # diff = 512 - target_features.shape[0]
+        # train_features = train_features[:diff].to(self.device) 
+        # print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
 
         # Apply MKl transport mapping to make the training features more similar to the target features
-        #Sort dimensions by standard devation
-        # train_features = self.perform_mkl_mapping(train_features, target_features)
+        train_features = self.perform_mkl_mapping(train_features, target_features)
 
         # Concatenate
         expanded_features = torch.cat([target_features, train_features], dim=0)
@@ -216,7 +211,7 @@ def main(target_length, set, k, batch_size):
     eval_csv = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/eval.csv")
     librispeech_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/librispeech/LibriSpeech/dev-clean")
     targets_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/librispeech_targets/dev/{target_length}")
-    output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/dev/real")
+    output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/dev/{target_length}")
     # train_dir = Path("/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/train_100")
     train_dir = Path("/mnt/d/librispeech_train/train")
     k_top = k
@@ -267,6 +262,7 @@ def main(target_length, set, k, batch_size):
                 )
                 #Target filename
                 target_wav_fn = (librispeech_dir / target_key).with_suffix(".flac")
+                #Skip conversions if neccessary
                 # if output_fn.exists():
                 #     continue
                 print(f"Converting speaker {source} clip: {clip} to speaker {target}")
@@ -300,13 +296,13 @@ def main(target_length, set, k, batch_size):
                     target_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers, batch_size)
                     print(f"New target set has {target_features.shape[0]} features")
 
-                # Perform kNN matching to get output features
-                # print("Performing kNN matching...")
-                # output_features = vc_model.knn_matching(source_features, target_features)
-                
+                # Perform kNN matching 
+                print(f"Performing kNN matching...")
+                output_features = vc_model.knn_matching(source_features, target_features)
+
                 # Perform MKL mapping
-                print("Performing MKL mapping")
-                output_features = vc_model.perform_mkl_mapping(source_features, target_features)
+                # print("Performing MKL mapping")
+                # output_features = vc_model.perform_mkl_mapping(source_features, target_features)
                 
                 # Vocode and save the output
                 print("Matching complete, vocoding and saving output...")
