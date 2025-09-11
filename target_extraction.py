@@ -11,15 +11,15 @@ def largest_divisor_in_range(n, low=1, high=1_000_000):
         if n % d == 0:
             return d
 
-def main(target_length, subpath):
+def main(target_length):
 ### Laptop
     # dev = "cpu"
     # target_dir_og = Path("/home/martinvs/librispeech_data/LibriSpeech/train-clean-100")
     # target_dir_new = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train_100")
 ### Desktop
     dev = "cuda"
-    target_dir_og = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/librispeech/LibriSpeech/dev-clean")
-    target_dir_new = Path("/mnt/c/Users/Martin/Documents/Werk/Universiteit/Skripsie_desktop/Skripsie2025_desktop/data/librispeech_targets/dev/3_expanded")
+    target_dir_og = Path("/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/librispeech/LibriSpeech/test-clean")
+    target_dir_new = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/librispeech_targets/test/{target_length}")
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=dev)
 
 
@@ -36,54 +36,23 @@ def main(target_length, subpath):
             continue
 
         audio = torch.empty(1, 0)
-        
         flac_files = sorted(speaker_dir.rglob("*.flac"))
         
         for flac_path in flac_files:
             waveform, sr = torchaudio.load(flac_path)
             audio = torch.cat([audio, waveform], dim=1)
             # For specific amount of audio
-            if audio.shape[1] >= target_length:
-                audio = audio[:, :target_length]
+            if audio.shape[1] >= (target_length*16000):
+                audio = audio[:, :(target_length*16000)]
                 break
         length = audio.shape[1] / 16000
         print(f"Accumulated {length} seconds of audio") 
 
         start = time.time()
         audio = audio.to(dev)
-        # chunk_length = 80000
-        # chunk_list = []
-        # for i in range(0, audio.shape[1], chunk_length):
-        #     chunk = audio[:, i : i + chunk_length]
-
-        #     # Check if chunk is too short
-        #     if chunk.shape[1] < 10:
-        #         print(f"Skipping chunk of size {chunk.shape[1]} from speaker {speaker_name}")
-        #         continue
-
-        #     try:
-        #         with torch.inference_mode():
-        #             chunk_features, _ = wavlm.extract_features(chunk, output_layer=6)
-        #         if chunk_features.dim() == 3:
-        #             chunk_features = chunk_features.squeeze(0)  # remove batch dimension only
-        #         elif chunk_features.dim() == 2:
-        #             pass  # already fine
-        #         else:
-        #             print(f"Unexpected shape: {chunk_features.shape}")
-        #             continue
-        #         chunk_list.append(chunk_features)
-        #     except Exception as e:
-        #         print(f"Failed to process chunk from speaker {speaker_name}, size={chunk.shape[1]}: {e}")
-        #         continue
-        # target_features = torch.cat(chunk_list, dim=0)
-
-        # Extract features from layers 4, 6 and 8 of WavLM
-        target_features = torch.empty(0,1024)
-        target_features = target_features.to(dev)
-        for layer in range(2,9):
-            feats, _ = wavlm.extract_features(audio, output_layer=layer)
-            feats = feats.squeeze(0)
-            target_features = torch.cat([target_features, feats], dim=0)
+        with torch.inference_mode():
+            target_features, _ = wavlm.extract_features(audio, output_layer=6)
+        target_features = target_features.squeeze(0)
 
         print(target_features.shape)
         print(f"Extracted {target_features.shape[0]} features from speaker {speaker_name}")
@@ -99,14 +68,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--target_length",
         type=int,
-        default=2880000,
-        help="Target length (in samples) of audio to extract features from (default: 2800000)"
-    )
-    parser.add_argument(
-        "--path",
-        type=str,
-        default="180",
-        help="Subfolder name under 'data/similarity/' to save extracted features (default: '180')"
+        default=180
     )
     args = parser.parse_args()
-    main(args.target_length, args.path)
+    main(args.target_length)
