@@ -1,8 +1,9 @@
-python3 target_extraction.py --target_length 90 
-python3 target_extraction.py --target_length 60
-python3 target_extraction.py --target_length 45
-python3 target_extraction.py --target_length 30
-python3 target_extraction.py --target_length 15 
-python3 target_extraction.py --target_length 10
-python3 target_extraction.py --target_length 6
-python3 target_extraction.py --target_length 3  
+python3 -W ignore speaker_id_extraction.py --target_length 180 --set test
+python3 -W ignore speaker_id_extraction.py --target_length 90 --set test
+python3 -W ignore speaker_id_extraction.py --target_length 60 --set test
+python3 -W ignore speaker_id_extraction.py --target_length 45 --set test
+python3 -W ignore speaker_id_extraction.py --target_length 30 --set test
+python3 -W ignore speaker_id_extraction.py --target_length 15 --set test
+python3 -W ignore speaker_id_extraction.py --target_length 10 --set test
+python3 -W ignore speaker_id_extraction.py --target_length 6 --set test
+python3 -W ignore speaker_id_extraction.py --target_length 3 --set test

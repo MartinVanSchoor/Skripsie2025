@@ -1,6 +1,9 @@
-python3 knn_vc.py --target_length 180 --batch_size 1024
-python3 knn_vc.py --target_length 180 --batch_size 512
-python3 knn_vc.py --target_length 180 --batch_size 256
-python3 knn_vc.py --target_length 180 --batch_size 128
-python3 knn_vc.py --target_length 180 --batch_size 64
-
+python3 -W ignore knn_vc.py --target_length 180 --set test
+python3 -W ignore knn_vc.py --target_length 90 --set test
+python3 -W ignore knn_vc.py --target_length 60 --set test
+python3 -W ignore knn_vc.py --target_length 45 --set test
+python3 -W ignore knn_vc.py --target_length 30 --set test
+python3 -W ignore knn_vc.py --target_length 15 --set test
+python3 -W ignore knn_vc.py --target_length 10 --set test
+python3 -W ignore knn_vc.py --target_length 6 --set test
+python3 -W ignore knn_vc.py --target_length 3 --set test
