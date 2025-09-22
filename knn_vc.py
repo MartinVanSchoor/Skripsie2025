@@ -140,11 +140,11 @@ class kNN_VC(torch.nn.Module):
         train_features = torch.from_numpy(train_features).to("cpu")
 
         # Retrieve the necessary amount of features and convert to appropriate device
-        #kNN approach
-        diff = 8996 - target_features.shape[0]
-        train_features = train_features[:diff].to(self.device) 
+        #kNN-E approach
+        # diff = 8996 - target_features.shape[0]
+        train_features = train_features[:12000].to(self.device) 
         print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
-        #MKL approach
+        #MKL+sampling approach
         # diff = 512 - target_features.shape[0]
         # train_features = train_features[:diff].to(self.device) 
         # print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
@@ -187,8 +187,8 @@ class kNN_VC(torch.nn.Module):
         X1 = target_features[:, idxes].cpu().numpy()
 
         #Ensure batch size isn't too large, and obtain and apply mapping
-        self.batch_size = min(len(X1)-4, self.batch_size)
-        XR = apply_mkl_batched(X0, X1, self.batch_size)
+        batch_size = min(len(X1)-4, self.batch_size)
+        XR = apply_mkl_batched(X0, X1, batch_size)
         output_features = source_features.clone()
         output_features[:, idxes] = torch.Tensor(XR).to(self.device)
         return output_features
@@ -197,22 +197,12 @@ def main(target_length, set, k, batch_size):
     
     print(f"Using {target_length} secs of target audio for the {set} set")
 ### Specify filenames and other variables
- ## For Laptop
-    # device = "cpu"
-    # perf = "/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/performance/08-05-2025.txt"
-    # eval_csv = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/eval.csv")
-    # librispeech_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/librispeech/Librispeech/dev-clean")
-    # targets_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/librispeech_targets/{target_length}")
-    # output_dir = Path(f"/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/converted/{target_length}")
-    # train_dir = Path("/mnt/c/Users/marti/Tuts_Projects/Skripsie/Skripsie2025/data/train")
- ## For Desktop
     device = "cuda"
     perf = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/performance/red_csv_vanilla.txt"
-    eval_csv = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/eval_{set}.csv")
-    librispeech_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/librispeech/LibriSpeech/{set}-clean")
+    eval_csv = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/eval_trimmed.csv")
+    librispeech_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/librispeech/LibriSpeech/dev-clean")
     targets_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/librispeech_targets/{set}/{target_length}")
-    output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/{set}/{target_length}")
-    # train_dir = Path("/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/train_100")
+    output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/dev_reduced/{target_length}")
     train_dir = Path("/mnt/d/librispeech_train/train")
     k_top = k
     
@@ -220,16 +210,16 @@ def main(target_length, set, k, batch_size):
     wavlm = torch.hub.load("bshall/knn-vc", "wavlm_large", trust_repo=True, device=device)
     hifigan, _ = torch.hub.load("bshall/knn-vc", "hifigan_wavlm", trust_repo=True, device=device, prematched=True)
     # Load speaker id's for sampling
-    # if (target_length < 180):
-    #     ids = torch.empty(0, 512).to(device)
-    #     speakers = np.array([], dtype=str)
-    #     for speaker_dir in tqdm(sorted(train_dir.iterdir()), desc="Loading training id's"):
-    #         speaker_name = speaker_dir.name
-    #         speaker_id_fn = speaker_dir / f"{speaker_name}_id.npy"
-    #         id = np.load(speaker_id_fn)
-    #         id = torch.from_numpy(id).unsqueeze(0).to(device)
-    #         speakers = np.append(speakers, speaker_name)
-    #         ids = torch.cat([ids, id], dim=0)
+    if (target_length < 180):
+        ids = torch.empty(0, 512).to(device)
+        speakers = np.array([], dtype=str)
+        for speaker_dir in tqdm(sorted(train_dir.iterdir()), desc="Loading training id's"):
+            speaker_name = speaker_dir.name
+            speaker_id_fn = speaker_dir / f"{speaker_name}_id.npy"
+            id = np.load(speaker_id_fn)
+            id = torch.from_numpy(id).unsqueeze(0).to(device)
+            speakers = np.append(speakers, speaker_name)
+            ids = torch.cat([ids, id], dim=0)
     
 ### Timing start and model initialization
     start = time.time()
@@ -238,6 +228,7 @@ def main(target_length, set, k, batch_size):
 ### Conversion of librispeech dev-clean set data according to eval.csv 
     output_dir.mkdir(parents=True, exist_ok=True)
     print("Writing to:", output_dir)
+    # count = 0
     with open(eval_csv) as f:
         for line in tqdm(f.readlines()):
             line = line.strip()
@@ -263,7 +254,8 @@ def main(target_length, set, k, batch_size):
                 #Target filename
                 target_wav_fn = (librispeech_dir / target_key).with_suffix(".flac")
                 #Skip conversions if neccessary
-                # if output_fn.exists():
+                # count = count + 1
+                # if count < 5841:
                 #     continue
                 print(f"Converting speaker {source} clip: {clip} to speaker {target}")
                 
@@ -291,10 +283,10 @@ def main(target_length, set, k, batch_size):
                 # print(f"Extracted {target_features.shape[0]} features from target speaker: {target}")
     
                 # If the target features are too few, expand the feature space
-                # if (target_length < 180): 
-                #     print("Insuficcient target data, expanding target set...")
-                #     target_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers, batch_size)
-                #     print(f"New target set has {target_features.shape[0]} features")
+                if (target_length < 180): 
+                    print("Insuficcient target data, expanding target set...")
+                    target_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers, batch_size)
+                    print(f"New target set has {target_features.shape[0]} features")
 
                 # Perform kNN matching 
                 print(f"Performing kNN matching...")
