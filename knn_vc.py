@@ -126,7 +126,7 @@ class kNN_VC(torch.nn.Module):
         return output_features
     
     @torch.inference_mode()
-    def expand_feature_space(self, target_id, target_features, train_dir, train_ids, train_speakers, batch_size):
+    def expand_feature_space(self, target_id, target_features, train_dir, train_ids, train_speakers, sample_size):
         """ 
         Expands the source speaker's feature space by sampling from
         the most similar speaker in the librispeech train-clean set,
@@ -141,8 +141,8 @@ class kNN_VC(torch.nn.Module):
 
         # Retrieve the necessary amount of features and convert to appropriate device
         #kNN-E approach
-        # diff = 8996 - target_features.shape[0]
-        train_features = train_features[:12000].to(self.device) 
+        diff = sample_size - target_features.shape[0]
+        train_features = train_features[:diff].to(self.device) 
         print(f"Loaded {train_features.shape[0]} features from speaker {closest_speaker}")
         #MKL+sampling approach
         # diff = 512 - target_features.shape[0]
@@ -187,22 +187,23 @@ class kNN_VC(torch.nn.Module):
         X1 = target_features[:, idxes].cpu().numpy()
 
         #Ensure batch size isn't too large, and obtain and apply mapping
-        batch_size = min(len(X1)-4, self.batch_size)
-        XR = apply_mkl_batched(X0, X1, batch_size)
+        # batch_size = min(len(X1)-4, self.batch_size)
+        XR = apply_mkl_batched(X0, X1, self.batch_size)
         output_features = source_features.clone()
         output_features[:, idxes] = torch.Tensor(XR).to(self.device)
         return output_features
         
-def main(target_length, set, k, batch_size):
+def main(target_length, set, k, batch_size, sample):
     
     print(f"Using {target_length} secs of target audio for the {set} set")
 ### Specify filenames and other variables
     device = "cuda"
     perf = "/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/performance/red_csv_vanilla.txt"
     eval_csv = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/eval_trimmed.csv")
-    librispeech_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/librispeech/LibriSpeech/dev-clean")
+    eval_csv_sim = Path("/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/eval_trimmed.csv")
+    librispeech_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/librispeech/LibriSpeech/{set}-clean")
     targets_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/librispeech_targets/{set}/{target_length}")
-    output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/dev_reduced/{target_length}")
+    output_dir = Path(f"/mnt/c/Users/marti/Documents/Werk/Universiteit/Skripsie/Skripsie2025/data/converted/{set}_reduced/{target_length}")
     train_dir = Path("/mnt/d/librispeech_train/train")
     k_top = k
     
@@ -255,16 +256,16 @@ def main(target_length, set, k, batch_size):
                 target_wav_fn = (librispeech_dir / target_key).with_suffix(".flac")
                 #Skip conversions if neccessary
                 # count = count + 1
-                # if count < 5841:
+                # if count < 4227:
                 #     continue
                 print(f"Converting speaker {source} clip: {clip} to speaker {target}")
                 
-                # Extract features for source
+                # Extract source features (query)
                 print("Extracting source features...")
                 source_features = vc_model.get_features(source_wav_fn, mode=1)
                 print(f"Extracted {source_features.shape[0]} features from source speaker: {source}")
                 
-                # Load target features from .pt file
+                # Load target features and id's from .pt file (matching set)
                 print("Loading in target features...")
                 feat_fn_with_suffix = target + ".pt"
                 id_fn_with_suffix = target + "_id.pt"
@@ -277,15 +278,15 @@ def main(target_length, set, k, batch_size):
                 print(f"Loaded {target_features.shape[0]} features from target speaker: {target}")
                 print(f"Loaded target id with {target_id.shape[0]} dimensions")
 
-                # # Extract target features from target utterance
+                # # Extract target features from target utterance (matching set)
                 # print("Extracting source features...")
                 # target_features = vc_model.get_features(target_wav_fn, mode=1)
                 # print(f"Extracted {target_features.shape[0]} features from target speaker: {target}")
     
-                # If the target features are too few, expand the feature space
+                # # If the target features are too few, expand the feature space
                 if (target_length < 180): 
                     print("Insuficcient target data, expanding target set...")
-                    target_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers, batch_size)
+                    target_features = vc_model.expand_feature_space(target_id, target_features, train_dir, ids, speakers, sample)
                     print(f"New target set has {target_features.shape[0]} features")
 
                 # Perform kNN matching 
@@ -309,7 +310,7 @@ def main(target_length, set, k, batch_size):
     
 ### Performance evaluation
     print("Evaluating similarity")
-    eer_mean, eer_std = evaluate_similarity(librispeech_dir, output_dir, eval_csv)
+    eer_mean, eer_std = evaluate_similarity(librispeech_dir, output_dir, eval_csv_sim)
     print("Evaluating intelligibility")
     wer_mean, wer_std, cer_mean, cer_std = evaluate_intelligibility(librispeech_dir, output_dir)
     with open(perf, "a") as f:
@@ -328,5 +329,6 @@ if __name__ == "__main__":
     parser.add_argument('--set', type=str, default="dev", help='Librispeech set to use (dev or test)')
     parser.add_argument('--k', type=int, default=4, help='k for kNN')
     parser.add_argument('--batch_size', type=int, default=2, help='Batch size (K) for MKL mapping (how many dimensions per group)')
+    parser.add_argument('--sample', type=int, default=15500, help='Sample size for sampling step')
     args = parser.parse_args()
-    main(args.target_length, args.set, args.k, args.batch_size)
+    main(args.target_length, args.set, args.k, args.batch_size, args.sample)

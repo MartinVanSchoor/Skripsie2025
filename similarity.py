@@ -64,7 +64,6 @@ def speaker_similarity(args):
         run_opts={"device": "cuda"},
     )
     pairs = pandas.read_csv(args.eval_csv)
-    # print(pairs)
     converted_pairs = pairs[pairs.label == 0]
     groundtruth_pairs = pairs[pairs.label == 1]
     scores = []

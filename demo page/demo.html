@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>kNN-VC-Enhanced</title>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <style>
+
+        body {
+            font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-weight: 400;
+            font-size: 16px;
+            line-height: 1.5;
+            color:#333;
+            background-color:#fff;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            line-height: 1.2;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 40px;  /* 42px */
+            font-weight: 300;
+            letter-spacing: -1px;
+            line-height: 1.1;
+        }
+
+        h2, h3 {
+            font-size: 25px;
+            font-weight: 400;
+        }
+
+/*      
+        @media handheld, only screen and (max-width:480px) {
+            body { padding: 0; }
+        }
+*/
+
+        table {
+            display: block;
+            width: 100%;
+            border-collapse: collapse;
+            overflow: auto;
+            text-align: center;
+        }
+
+        a{
+            color: #2a7ae2;
+            text-decoration: none;
+        }
+        a:visited{
+            color: #1756a9;
+        }
+        a:hover{
+            color: #333;
+            text-decoration: underline;
+        }
+
+        .audio_smaller {
+            max-width: 210px;  /* 195px */
+        }
+
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:300,400,700,italic" rel="stylesheet">
+</head>
+
+<body>
+    <h1>kNN-VC-Enhanced - Training-free, any-to-any one-shot voice conversion</h1>
+
+    <p style="text-align: center">
+        <a>Marthinus Enslin Van Schoor</a>
+    </p>
+    <p style="text-align: center">
+        [<a href="https://github.com/MartinVanSchoor" target="_blank" rel="external noopener noreferrer">code</a>]
+    </p>
+
+    <p>
+        We introduce kNN-VC-Enhanced, an improvement of the kNN-VC model, which features improved performance for low-data scenarios, and provides a means for efficient, training-free conversion which works for low reesource (limited computing power) scenarios. This work provides a model which is robust and practical for a wide variety of applications, as conversions can be made using only a single, short utterance from the target speaker, as is illustrated in the examples below. The goal of this demo pages is to provide the reader of the report with real examples to consult as they read relevant sections of the report, to gain a better understanding of choices made and how the results actually sound
+    </p>
+
+    <h2>kNN-VC-Enhanced examples, compared with its predecessor as well as other models</h2>
+
+    <table>
+        <tbody>        
+        <tr>
+            <td>Source</td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/3_source_1188-133604-0036-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/6_source_1320-122612-0008-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/7_source_1320-122612-0013-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/8_source_1580-141083-0003-norm.wav"></audio>
+            </td>
+        </tr>
+        <tr>
+            <td>Target</td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/3_target_1995-1837-0007-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/6_target_1188-133604-0025-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/7_target_1221-135766-0004-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/8_target_2830-3980-0037-norm.wav"></audio>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <a href="https://arxiv.org/abs/2210.15418" target="_blank" rel="external noopener noreferrer">FreeVC</a>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/3_freevc-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/6_freevc-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/7_freevc-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/8_freevc-norm.wav"></audio>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <a href="https://arxiv.org/abs/2305.09636" target="_blank" rel="external noopener noreferrer">SoundStorm</a>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/3_llm-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/6_llm-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/7_llm-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/8_llm-norm.wav"></audio>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <a href="https://arxiv.org/abs/2305.18975" target="_blank" rel="external noopener noreferrer">kNN-VC</a>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/3_knnvc-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/6_knnvc-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/7_knnvc-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/8_knnvc-norm.wav"></audio>
+            </td>
+        </tr>
+        <tr>
+            <td>LinearVC</td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/3_linearvc-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/6_linearvc-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/7_linearvc-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/8_linearvc-norm.wav"></audio>
+            </td>
+        </tr>
+        <tr>
+            <td>LinearVC cont. fact.</td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/3_linearvc_contentfact-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/6_linearvc_contentfact-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/7_linearvc_contentfact-norm.wav"></audio>
+            </td>
+            <td>
+                <audio class="audio_smaller" controls controlsList="nodownload noplaybackrate" preload="metadata" src="wav/subjective/8_linearvc_contentfact-norm.wav"></audio>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+    <br>
+
+</body>
+
+</html>

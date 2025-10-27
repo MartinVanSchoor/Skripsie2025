@@ -1,9 +1,7 @@
-python3 -W ignore knn_vc.py --target_length 3 --batch_size 256
-python3 -W ignore knn_vc.py --target_length 6 --batch_size 256
-python3 -W ignore knn_vc.py --target_length 10 --batch_size 256
-python3 -W ignore knn_vc.py --target_length 15 --batch_size 256
-python3 -W ignore knn_vc.py --target_length 30 --batch_size 256
-python3 -W ignore knn_vc.py --target_length 45 --batch_size 256
-python3 -W ignore knn_vc.py --target_length 60 --batch_size 256
-python3 -W ignore knn_vc.py --target_length 90 --batch_size 256
-python3 -W ignore knn_vc.py --target_length 180 --batch_size 256
+python3 -W ignore knn_vc.py --target_length 3 --batch_size 4 --sample 8996
+python3 -W ignore knn_vc.py --target_length 3 --batch_size 16 --sample 8996
+python3 -W ignore knn_vc.py --target_length 3 --batch_size 128 --sample 8996
+python3 -W ignore knn_vc.py --target_length 3 --batch_size 145 --sample 8996
+python3 -W ignore knn_vc.py --target_length 3 --batch_size 165 --sample 8996
+python3 -W ignore knn_vc.py --target_length 3 --batch_size 200 --sample 8996
+python3 -W ignore knn_vc.py --target_length 3 --batch_size 256 --sample 8996
